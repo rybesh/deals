@@ -86,8 +86,8 @@ def find_deals(conditions, currencies):
             wantlist_url = ('https://www.discogs.com/sell/mpmywantsrss?'
                             + urlencode(wantlist_params, quote_via=quote_plus))
 
-            r = requests.get(wantlist_url)
-            feed = atoma.parse_atom_bytes(r.content)
+            feed = atoma.parse_atom_bytes(get(wantlist_url).encode('utf8'))
+
             exchange_rate = get_rate('USD', currency)
 
             for entry in feed.entries:
@@ -142,19 +142,23 @@ parser.add_argument("outfile")
 
 args = parser.parse_args()
 
-fg = FeedGenerator()
-fg.id(FEED_URL)
-fg.title('Discogs Deals')
-fg.updated(now())
-fg.link(href=FEED_URL, rel='self')
-fg.author({'name': 'Ryan Shaw', 'email': 'rieyin@icloud.com'})
+try:
+    fg = FeedGenerator()
+    fg.id(FEED_URL)
+    fg.title('Discogs Deals')
+    fg.updated(now())
+    fg.link(href=FEED_URL, rel='self')
+    fg.author({'name': 'Ryan Shaw', 'email': 'rieyin@icloud.com'})
 
-for deal in find_deals(args.condition, args.currency):
-    fe = fg.add_entry()
-    fe.id(deal['id'])
-    fe.title(deal['title'])
-    fe.updated(deal['updated'])
-    fe.link(href=deal['id'])
-    fe.content(deal['summary'], type='html')
+    for deal in find_deals(args.condition, args.currency):
+        fe = fg.add_entry()
+        fe.id(deal['id'])
+        fe.title(deal['title'])
+        fe.updated(deal['updated'])
+        fe.link(href=deal['id'])
+        fe.content(deal['summary'], type='html')
 
-fg.atom_file(args.outfile)
+    fg.atom_file(args.outfile)
+
+except DealException as e:
+    print(e, file=stderr)
