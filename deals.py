@@ -98,7 +98,9 @@ def find_deals(conditions, currencies):
                     if median is None:
                         continue
 
-                    if not price < (median * exchange_rate):
+                    median = median * exchange_rate
+
+                    if not price < median:
                         continue
 
                     discount = int((median - price) / median * 100)
