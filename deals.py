@@ -109,7 +109,7 @@ def find_deals(conditions, currencies):
                         'id': entry.id_,
                         'title': entry.title.value,
                         'updated': isoformat(entry.updated),
-                        'summary': ('<b>%s%% below median</b> %s'
+                        'summary': ('<b>%s%% below median</b><br>%s'
                                     % (discount, entry.summary.value)),
                     }
 
