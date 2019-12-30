@@ -26,14 +26,22 @@ CURRENCIES = [
 
 
 class DealException(Exception):
-    pass
+    def __init__(self, message, status_code=None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def log_error(e, entry_id=None):
+    if e.status_code == 502:
+        return
+    print(e if entry_id is None else '%s: %s' % (entry_id, e), file=stderr)
 
 
 def get(url):
     sleep(1)
     r = requests.get(url)
     if not r.status_code == 200:
-        raise DealException('GET %s: %s' % (url, r.status_code))
+        raise DealException('GET %s failed' % url, r.status_code)
     return r.text
 
 
@@ -114,7 +122,7 @@ def find_deals(conditions, currencies):
                     }
 
                 except DealException as e:
-                    print('%s: %s' % (entry.id_, e), file=stderr)
+                    log_error(e, entry.id_)
 
 
 def condition(arg):
@@ -161,4 +169,4 @@ try:
     fg.atom_file(args.outfile)
 
 except DealException as e:
-    print(e, file=stderr)
+    log_error(e)
