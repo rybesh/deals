@@ -32,9 +32,13 @@ class DealException(Exception):
 
 
 def log_error(e, entry_id=None):
-    if e.status_code == 502:
-        return
-    print(e if entry_id is None else '%s: %s' % (entry_id, e), file=stderr)
+    msg = '%s%s%s' % (
+        '' if entry_id is None else ('%s: ' % entry_id),
+        e,
+        '' if e.status_code is None else (' (%s)' % e.status_code)
+    )
+    if not e.status_code == 502:
+        print(msg, file=stderr)
 
 
 def get(url):
