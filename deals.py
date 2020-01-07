@@ -31,11 +31,13 @@ class DealException(Exception):
         self.status_code = status_code
 
 
-def log_error(e, entry_id=None):
+def log_error(e, entry=None):
     msg = '%s%s%s' % (
-        '' if entry_id is None else ('%s: ' % entry_id),
+        '' if entry is None else (
+            '%s (%s): ' % (entry.id_, entry.title.value)),
         e,
-        '' if e.status_code is None else (' (%s)' % e.status_code)
+        '' if e.status_code is None else (
+            ' (%s)' % e.status_code)
     )
     if not e.status_code == 502:
         print(msg, file=stderr)
@@ -126,7 +128,7 @@ def find_deals(conditions, currencies):
                     }
 
                 except DealException as e:
-                    log_error(e, entry.id_)
+                    log_error(e, entry)
 
 
 def condition(arg):
