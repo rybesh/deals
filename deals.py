@@ -60,13 +60,19 @@ def find_release_url(sell_url):
 
 def find_median_price(sell_url):
     release_html = get(find_release_url(sell_url))
-    m = re.search(r'<h4>Last Sold:</h4>\n\s+Never', release_html)
+    m = re.search(
+        r'<h4>Last Sold:</h4>\n\s+Never',
+        release_html
+    )
     if m is not None:
         return None
-    m = re.search(r'<h4>Median:</h4>\n\s+\$(\d+\.\d\d)\n', release_html)
+    m = re.search(
+        r'<h4>Median:</h4>\n\s+\$((?:\d+,)*\d+.\d{2})\n',
+        release_html
+    )
     if m is None:
         raise DealException('median price not found')
-    return float(m.group(1))
+    return float(m.group(1).replace(',', ''))
 
 
 def find_sale_price(summary_text):
