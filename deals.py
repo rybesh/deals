@@ -45,10 +45,13 @@ def log_error(e, entry=None):
 
 def get(url):
     sleep(1)
-    r = requests.get(url)
-    if not r.status_code == 200:
-        raise DealException('GET %s failed' % url, r.status_code)
-    return r.text
+    try:
+        r = requests.get(url)
+        if not r.status_code == 200:
+            raise DealException('GET %s failed' % url, r.status_code)
+        return r.text
+    except requests.exceptions.SSLError as e:
+        raise DealException(str(e))
 
 
 def find_release_url(sell_url):
