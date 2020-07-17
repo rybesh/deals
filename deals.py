@@ -125,6 +125,9 @@ def find_deals(conditions, currencies):
 
                     discount = int((median - price) / median * 100)
 
+                    if discount < 20:
+                        continue
+
                     yield {
                         'id': entry.id_,
                         'title': entry.title.value,
