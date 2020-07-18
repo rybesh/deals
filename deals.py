@@ -138,7 +138,7 @@ def find_deals(conditions, currencies):
 
                 except DealException as e:
                     log_error(e, entry)
-                except requests.exception.RequestException:
+                except requests.exceptions.RequestException:
                     pass
 
 
