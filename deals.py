@@ -46,11 +46,11 @@ def log_error(e, entry=None):
 def get(url):
     sleep(1)
     try:
-        r = requests.get(url)
+        r = requests.get(url, timeout=0.001)
         if not r.status_code == 200:
             raise DealException('GET %s failed' % url, r.status_code)
         return r.text
-    except requests.exceptions.SSLError as e:
+    except requests.exceptions.RequestException as e:
         raise DealException(str(e))
 
 
