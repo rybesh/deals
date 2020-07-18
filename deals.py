@@ -45,13 +45,10 @@ def log_error(e, entry=None):
 
 def get(url):
     sleep(1)
-    try:
-        r = requests.get(url, timeout=0.001)
-        if not r.status_code == 200:
-            raise DealException('GET %s failed' % url, r.status_code)
-        return r.text
-    except requests.exceptions.RequestException as e:
-        raise DealException(str(e))
+    r = requests.get(url, timeout=1)
+    if not r.status_code == 200:
+        raise DealException('GET %s failed' % url, r.status_code)
+    return r.text
 
 
 def find_release_url(sell_url):
@@ -141,6 +138,8 @@ def find_deals(conditions, currencies):
 
                 except DealException as e:
                     log_error(e, entry)
+                except requests.exception.RequestException:
+                    pass
 
 
 def condition(arg):
