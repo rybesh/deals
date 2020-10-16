@@ -125,7 +125,7 @@ def find_deals(conditions, currencies):
 
                     discount = int((median - price) / median * 100)
 
-                    if discount < 20:
+                    if discount < 15:
                         continue
 
                     yield {
