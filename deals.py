@@ -67,7 +67,7 @@ def find_median_price(sell_url):
     if m is not None:
         return None
     m = re.search(
-        r'<h4>Median:</h4>\n\s+\$((?:\d+,)*\d+.\d{2})\n',
+        r'<h4>Median:</h4>\n\s+\$((?:\d+,)*\d+\.\d{2})\n',
         release_html
     )
     if m is None:
