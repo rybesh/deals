@@ -102,6 +102,7 @@ def find_deals(conditions, currencies):
                 'user': 'rybesh',
                 'condition': condition,
                 'currency': currency,
+                'hours_range': '0-12',
             }
             wantlist_url = ('https://www.discogs.com/sell/mpmywantsrss?'
                             + urlencode(wantlist_params, quote_via=quote_plus))
