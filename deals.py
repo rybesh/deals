@@ -155,9 +155,6 @@ def find_deals(conditions, currencies):
                     release_age = date.today().year - release_year
 
                     if condition == CONDITIONS['VG+']:
-                        print(entry.title.value)
-                        print(seller_rating)
-                        print(release_age)
                         if release_age < 50:
                             continue
                         if seller_rating < 99.0:
