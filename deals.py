@@ -8,13 +8,14 @@ from sys import stderr
 from time import sleep
 from urllib.parse import urlencode, quote_plus
 from forex_python.converter import get_rate
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from feedgen.feed import FeedGenerator
 
 
 FEED_URL = 'https://deals.aeshin.org/'
 
 CONDITIONS = {
+    'VG+': 'Very Good Plus (VG+)',
     'NM': 'Near Mint (NM or M-)',
     'M': 'Mint (M)',
 }
@@ -51,15 +52,22 @@ def get(url):
     return r.text
 
 
-def find_release_url(sell_url):
-    m = re.search(r'/release/(\d+)\?ev=item-vc"', get(sell_url))
+def find_release_url(sale_html):
+    m = re.search(r'/release/(\d+)\?ev=item-vc"', sale_html)
     if m is None:
         raise DealException('release id not found')
     return 'https://www.discogs.com/release/%s' % m.group(1)
 
 
-def find_median_price(sell_url):
-    release_html = get(find_release_url(sell_url))
+def find_seller_rating(sale_html):
+    m = re.search(r'<strong>(\d{2,3}\.\d)%</strong>', sale_html)
+    if m is None:
+        return 0.0
+    else:
+        return float(m.group(1))
+
+
+def find_median_price(release_html):
     m = re.search(
         r'<h4>Last Sold:</h4>\n\s+Never',
         release_html
@@ -73,6 +81,17 @@ def find_median_price(sell_url):
     if m is None:
         raise DealException('median price not found')
     return float(m.group(1).replace(',', ''))
+
+
+def find_release_year(release_html):
+    m = re.search(
+        r'<a href="/search/\?decade=\d{4}&year=(\d{4})">',
+        release_html
+    )
+    if m is None:
+        return date.today().year
+    else:
+        return int(m.group(1))
 
 
 def find_sale_price(summary_text):
@@ -113,8 +132,12 @@ def find_deals(conditions, currencies):
 
             for entry in feed.entries:
                 try:
+                    sale_html = get(entry.id_)
+                    release_html = get(find_release_url(sale_html))
+                    seller_rating = find_seller_rating(sale_html)
+                    median = find_median_price(release_html)
+                    release_year = find_release_year(release_html)
                     price = find_sale_price(entry.summary.value)
-                    median = find_median_price(entry.id_)
 
                     if median is None:
                         continue
@@ -128,6 +151,17 @@ def find_deals(conditions, currencies):
 
                     if discount < 15:
                         continue
+
+                    release_age = date.today().year - release_year
+
+                    if condition == CONDITIONS['VG+']:
+                        print(entry.title.value)
+                        print(seller_rating)
+                        print(release_age)
+                        if release_age < 50:
+                            continue
+                        if seller_rating < 99.0:
+                            continue
 
                     yield {
                         'id': entry.id_,
