@@ -23,6 +23,7 @@ CONDITIONS = {
 CURRENCIES = [
     'USD',
     'JPY',
+    'GBP',
 ]
 
 
