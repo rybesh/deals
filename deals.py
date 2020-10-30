@@ -24,6 +24,7 @@ CURRENCIES = [
     'USD',
     'JPY',
     'GBP',
+    'EUR',
 ]
 
 
