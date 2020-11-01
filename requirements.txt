@@ -1,4 +1,3 @@
 atoma==0.0.17
 feedgen==0.9.0
-forex-python==1.5
 requests==2.24.0

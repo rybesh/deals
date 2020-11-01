@@ -7,7 +7,6 @@ import re
 from sys import stderr
 from time import sleep
 from urllib.parse import urlencode, quote_plus
-from forex_python.converter import get_rate
 from datetime import date, datetime, timezone
 from feedgen.feed import FeedGenerator
 
@@ -67,6 +66,13 @@ def find_seller_rating(sale_html):
         return 0.0
     else:
         return float(m.group(1))
+
+
+def find_total_price(sale_html):
+    m = re.search(r'<i>\(about \$(\d+\.\d\d) total\)</i>', sale_html)
+    if m is None:
+        raise DealException('total price not found')
+    return float(m.group(1))
 
 
 def find_median_price(release_html):
@@ -130,8 +136,6 @@ def find_deals(conditions, currencies):
 
             feed = atoma.parse_atom_bytes(get(wantlist_url).encode('utf8'))
 
-            exchange_rate = get_rate('USD', currency)
-
             for entry in feed.entries:
                 try:
                     sale_html = get(entry.id_)
@@ -139,12 +143,14 @@ def find_deals(conditions, currencies):
                     seller_rating = find_seller_rating(sale_html)
                     median = find_median_price(release_html)
                     release_year = find_release_year(release_html)
-                    price = find_sale_price(entry.summary.value)
 
                     if median is None:
                         continue
 
-                    median = median * exchange_rate
+                    if currency == 'USD':
+                        price = find_sale_price(entry.summary.value)
+                    else:
+                        price = find_total_price(sale_html)
 
                     if not price < median:
                         continue
