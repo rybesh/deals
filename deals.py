@@ -71,7 +71,7 @@ def find_seller_rating(sale_html):
 def find_total_price(sale_html):
     m = re.search(r'<i>\(about \$(\d+\.\d\d) total\)</i>', sale_html)
     if m is None:
-        raise DealException('total price not found')
+        return None
     return float(m.group(1))
 
 
@@ -151,6 +151,8 @@ def find_deals(conditions, currencies):
                         price = find_sale_price(entry.summary.value)
                     else:
                         price = find_total_price(sale_html)
+                        if price is None:
+                            continue
 
                     if not price < median:
                         continue
