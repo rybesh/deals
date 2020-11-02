@@ -88,13 +88,17 @@ def find_sale_price(summary_text):
 def find_shipping_price(sale_html):
     m = re.search(r'\+ \$(\d+\.\d\d) shipping', sale_html)
     if m is None:
-        raise DealException('shipping price not found')
+        return None
     return float(m.group(1))
 
 
 def find_total_price(currency, summary_text, sale_html):
     if currency == 'USD':
-        return (find_sale_price(summary_text) + find_shipping_price(sale_html))
+        sale_price = find_sale_price(summary_text)
+        shipping = find_shipping_price(sale_html)
+        if shipping is None:
+            return None
+        return sale_price + shipping
     else:
         m = re.search(r'<i>\(about \$(\d+\.\d\d) total\)</i>', sale_html)
         if m is None:
