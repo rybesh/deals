@@ -20,10 +20,18 @@ CONDITIONS = {
 }
 
 CURRENCIES = [
-    'USD',
-    'JPY',
-    'GBP',
+    'AUD',
+    'BRL',
+    'CAD',
+    'CHF',
     'EUR',
+    'GBP',
+    'JPY',
+    'MXN',
+    'NZD',
+    'SEK',
+    'USD',
+    'ZAR',
 ]
 
 
