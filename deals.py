@@ -76,11 +76,30 @@ def find_seller_rating(sale_html):
         return float(m.group(1))
 
 
-def find_total_price(sale_html):
-    m = re.search(r'<i>\(about \$(\d+\.\d\d) total\)</i>', sale_html)
+def find_sale_price(summary_text):
+    m = re.search(
+        r'(?:%s) (\d+\.\d\d) - ' % ('|'.join(CURRENCIES)),
+        summary_text)
     if m is None:
-        return None
+        raise DealException('price not found')
     return float(m.group(1))
+
+
+def find_shipping_price(sale_html):
+    m = re.search(r'\+ \$(\d+\.\d\d) shipping', sale_html)
+    if m is None:
+        raise DealException('shipping price not found')
+    return float(m.group(1))
+
+
+def find_total_price(currency, summary_text, sale_html):
+    if currency == 'USD':
+        return (find_sale_price(summary_text) + find_shipping_price(sale_html))
+    else:
+        m = re.search(r'<i>\(about \$(\d+\.\d\d) total\)</i>', sale_html)
+        if m is None:
+            return None
+        return float(m.group(1))
 
 
 def find_median_price(release_html):
@@ -108,15 +127,6 @@ def find_release_year(release_html):
         return date.today().year
     else:
         return int(m.group(1))
-
-
-def find_sale_price(summary_text):
-    m = re.search(
-        r'(?:%s) (\d+\.\d\d) - ' % ('|'.join(CURRENCIES)),
-        summary_text)
-    if m is None:
-        raise DealException('price not found')
-    return float(m.group(1))
 
 
 def isoformat(dt):
@@ -149,18 +159,16 @@ def find_deals(conditions, currencies):
                     sale_html = get(entry.id_)
                     release_html = get(find_release_url(sale_html))
                     seller_rating = find_seller_rating(sale_html)
+                    price = find_total_price(
+                        currency, entry.summary.value, sale_html)
                     median = find_median_price(release_html)
                     release_year = find_release_year(release_html)
 
                     if median is None:
                         continue
 
-                    if currency == 'USD':
-                        price = find_sale_price(entry.summary.value)
-                    else:
-                        price = find_total_price(sale_html)
-                        if price is None:
-                            continue
+                    if price is None:
+                        continue
 
                     if not price < median:
                         continue
