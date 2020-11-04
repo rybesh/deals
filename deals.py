@@ -179,7 +179,7 @@ def find_deals(conditions, currencies):
 
                     discount = int((median - price) / median * 100)
 
-                    if discount < 15:
+                    if discount < 10:
                         continue
 
                     release_age = date.today().year - release_year
