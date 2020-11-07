@@ -174,6 +174,9 @@ def find_deals(conditions, currencies):
                     if price is None:
                         continue
 
+                    # adjust price for standard domestic shipping
+                    price = price - 4.00
+
                     if not price < median:
                         continue
 
