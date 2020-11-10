@@ -84,7 +84,7 @@ def get_total_price(listing):
     price = listing['price'].get('value')
     shipping = listing['shipping_price'].get('value')
     if price and shipping:
-        return round(price + shipping, 2)
+        return price + shipping
     else:
         return None
 
@@ -118,7 +118,7 @@ def discount(price, benchmark):
     if benchmark is None:
         return None
     else:
-        return int((benchmark - price) / benchmark * 100)
+        return round((benchmark - price) / benchmark * 100)
 
 
 def summarize_discount(discount):
@@ -184,18 +184,6 @@ def get_deals(conditions, currencies, minimum_discount):
                     discount_from_median = discount(price, median_price)
                     discount_from_suggested = discount(price, suggested_price)
 
-                    debug(
-                        f'\n{entry.title.value}\n'
-                        f'{entry.summary.value}\n'
-                        f'price: {price}\n'
-                        f'median price: {median_price}\n'
-                        f'suggested price: {suggested_price}\n'
-                        f'seller rating: {seller_rating}\n'
-                        f'release year: {release_year}\n'
-                        f'discount from median: {discount_from_median}\n'
-                        f'discount from suggested: {discount_from_suggested}\n'
-                    )
-
                     if discount_from_median < minimum_discount:
                         continue
 
@@ -207,11 +195,23 @@ def get_deals(conditions, currencies, minimum_discount):
                         if seller_rating < ALLOW_VG['minimum_seller_rating']:
                             continue
 
+                    debug(
+                        f'\n{entry.title.value}\n'
+                        f'{entry.summary.value}\n'
+                        f'price: ${price:.2f}\n'
+                        f'median price: ${median_price:.2f}\n'
+                        f'suggested price: ${suggested_price:.2f}\n'
+                        f'seller rating: {seller_rating:.1f}\n'
+                        f'release year: {release_year}\n'
+                        f'discount from median: {discount_from_median}%\n'
+                        f'discount from suggested: {discount_from_suggested}%\n'
+                    )
+
                     summary = (
                         f'<b>{summarize_discount(discount_from_median)}'
-                        f' median ({round(median_price, 2)})</b><br>'
+                        f' median price (${median_price:.2f})</b><br>'
                         f'{summarize_discount(discount_from_suggested)}'
-                        f' suggested ({round(suggested_price, 2)})<br>'
+                        f' suggested price (${suggested_price:.2f})<br><br>'
                         f'{entry.summary.value}'
                     )
 
