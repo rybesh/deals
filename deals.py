@@ -9,30 +9,20 @@ from time import sleep
 from urllib.parse import urlencode, quote_plus
 from datetime import date, datetime, timezone
 from feedgen.feed import FeedGenerator
-
-
-FEED_URL = 'https://deals.aeshin.org/'
-
-CONDITIONS = {
-    'VG+': 'Very Good Plus (VG+)',
-    'NM': 'Near Mint (NM or M-)',
-    'M': 'Mint (M)',
-}
-
-CURRENCIES = [
-    'AUD',
-    'BRL',
-    'CAD',
-    'CHF',
-    'EUR',
-    'GBP',
-    'JPY',
-    'MXN',
-    'NZD',
-    'SEK',
-    'USD',
-    'ZAR',
-]
+from ratelimit import limits, sleep_and_retry
+from config import (
+    ALLOW_VG,
+    API,
+    CONDITIONS,
+    CURRENCIES,
+    DEBUG,
+    DISCOGS_USER,
+    FEED_AUTHOR,
+    FEED_URL,
+    STANDARD_SHIPPING,
+    TOKEN,
+    WWW,
+)
 
 
 class DealException(Exception):
@@ -42,71 +32,69 @@ class DealException(Exception):
 
 
 def log_error(e, entry=None):
-    msg = '%s%s%s' % (
-        '' if entry is None else (
-            '%s (%s): ' % (entry.id_, entry.title.value)),
-        e,
-        '' if e.status_code is None else (
-            ' (%s)' % e.status_code)
+    msg = (
+        f'{entry.id_}/n' if entry else ''
+        f'{entry.title.value}/n' if entry else ''
+        f'{e}',
+        f' ({e.status_code})\n' if e.status_code else '\n'
     )
     if not e.status_code == 502:
         print(msg, file=stderr)
 
 
+def debug(x):
+    if DEBUG:
+        print(x, file=stderr)
+
+
+@sleep_and_retry
+@limits(calls=1, period=1)
+def call_api(endpoint, params={}):
+    r = requests.get(
+        API + endpoint,
+        params=params,
+        headers={'Authorization': f'Discogs token={TOKEN}'},
+        timeout=10,
+    )
+    calls_remaining = int(r.headers['X-Discogs-Ratelimit-Remaining'])
+    debug(f'{calls_remaining} calls remaining')
+    if calls_remaining < 5:
+        debug('sleeping...')
+        sleep(10)
+    if not r.status_code == 200:
+        raise DealException(f'GET {r.url} failed', r.status_code)
+    return r.json()
+
+
+@sleep_and_retry
+@limits(calls=1, period=1)
 def get(url):
-    sleep(2)
     r = requests.get(url, timeout=10)
     if not r.status_code == 200:
-        raise DealException('GET %s failed' % url, r.status_code)
+        raise DealException(f'GET {r.url} failed', r.status_code)
+    r.encoding = 'UTF-8'
     return r.text
 
 
-def find_release_url(sale_html):
-    m = re.search(r'/release/(\d+)\?ev=item-vc"', sale_html)
-    if m is None:
-        raise DealException('release id not found')
-    return 'https://www.discogs.com/release/%s' % m.group(1)
+def get_seller_rating(listing):
+    return float(listing['seller']['stats'].get('rating', '0.0'))
 
 
-def find_seller_rating(sale_html):
-    m = re.search(r'<strong>(\d{2,3}\.\d)%</strong>', sale_html)
-    if m is None:
-        return 0.0
+def get_total_price(listing):
+    price = listing['price'].get('value')
+    shipping = listing['shipping_price'].get('value')
+    if price and shipping:
+        return round(price + shipping, 2)
     else:
-        return float(m.group(1))
-
-
-def find_sale_price(summary_text):
-    m = re.search(
-        r'(?:%s) (\d+\.\d\d) - ' % ('|'.join(CURRENCIES)),
-        summary_text)
-    if m is None:
-        raise DealException('price not found')
-    return float(m.group(1))
-
-
-def find_shipping_price(sale_html):
-    m = re.search(r'\+ \$(\d+\.\d\d) shipping', sale_html)
-    if m is None:
         return None
-    return float(m.group(1))
 
 
-def find_total_price(currency, summary_text, sale_html):
-    if currency == 'USD':
-        sale_price = find_sale_price(summary_text)
-        shipping = find_shipping_price(sale_html)
-        if shipping is None:
-            return None
-        return sale_price + shipping
-    else:
-        m = re.search(r'<i>\(about \$(\d+\.\d\d) total\)</i>', sale_html)
-        if m is None:
-            return None
-        return float(m.group(1))
+def get_suggested_price(release_id, condition):
+    suggestions = call_api(f'/marketplace/price_suggestions/{release_id}')
+    return suggestions.get(condition, {}).get('value')
 
 
-def find_median_price(release_html):
+def get_median_price(release_html):
     m = re.search(
         r'<h4>Last Sold:</h4>\n\s+Never',
         release_html
@@ -122,15 +110,24 @@ def find_median_price(release_html):
     return float(m.group(1).replace(',', ''))
 
 
-def find_release_year(release_html):
-    m = re.search(
-        r'<a href="/search/\?decade=\d{4}&year=(\d{4})">',
-        release_html
-    )
-    if m is None:
-        return date.today().year
+def get_release_year(listing):
+    return listing['release'].get('year', date.today().year)
+
+
+def discount(price, benchmark):
+    if benchmark is None:
+        return None
     else:
-        return int(m.group(1))
+        return int((benchmark - price) / benchmark * 100)
+
+
+def summarize_discount(discount):
+    if discount > 0:
+        return f'{discount}% below'
+    elif discount < 0:
+        return f'{-discount}% above'
+    else:
+        return 'same as'
 
 
 def isoformat(dt):
@@ -141,70 +138,94 @@ def now():
     return isoformat(datetime.now(timezone.utc))
 
 
-def find_deals(conditions, currencies):
+def get_deals(conditions, currencies, minimum_discount):
 
     for condition in args.condition:
         for currency in args.currency:
 
             wantlist_params = {
                 'output': 'rss',
-                'user': 'rybesh',
+                'user': DISCOGS_USER,
                 'condition': condition,
                 'currency': currency,
                 'hours_range': '0-12',
             }
-            wantlist_url = ('https://www.discogs.com/sell/mpmywantsrss?'
-                            + urlencode(wantlist_params, quote_via=quote_plus))
+            wantlist_url = (
+                f'{WWW}/sell/mpmywantsrss?'
+                f'{urlencode(wantlist_params, quote_via=quote_plus)}'
+            )
 
             feed = atoma.parse_atom_bytes(get(wantlist_url).encode('utf8'))
 
             for entry in feed.entries:
                 try:
-                    sale_html = get(entry.id_)
-                    release_html = get(find_release_url(sale_html))
-                    seller_rating = find_seller_rating(sale_html)
-                    price = find_total_price(
-                        currency, entry.summary.value, sale_html)
-                    median = find_median_price(release_html)
-                    release_year = find_release_year(release_html)
+                    listing_id = entry.id_.split('/')[-1]
+                    listing = call_api(f'/marketplace/listings/{listing_id}')
+                    seller_rating = get_seller_rating(listing)
+                    price = get_total_price(listing)
+                    release_year = get_release_year(listing)
+                    release_id = listing['release']['id']
+                    release_url = f'{WWW}/release/{release_id}'
+                    median_price = get_median_price(get(release_url))
+                    suggested_price = get_suggested_price(release_id, condition)
 
-                    if median is None:
+                    if median_price is None:
                         continue
 
                     if price is None:
                         continue
 
                     # adjust price for standard domestic shipping
-                    price = price - 4.00
+                    price = price - STANDARD_SHIPPING
 
-                    if not price < median:
+                    if not price < median_price:
                         continue
 
-                    discount = int((median - price) / median * 100)
+                    discount_from_median = discount(price, median_price)
+                    discount_from_suggested = discount(price, suggested_price)
 
-                    if discount < 10:
+                    debug(
+                        f'\n{entry.title.value}\n'
+                        f'{entry.summary.value}\n'
+                        f'price: {price}\n'
+                        f'median price: {median_price}\n'
+                        f'suggested price: {suggested_price}\n'
+                        f'seller rating: {seller_rating}\n'
+                        f'release year: {release_year}\n'
+                        f'discount from median: {discount_from_median}\n'
+                        f'discount from suggested: {discount_from_suggested}\n'
+                    )
+
+                    if discount_from_median < minimum_discount:
                         continue
 
                     release_age = date.today().year - release_year
 
                     if condition == CONDITIONS['VG+']:
-                        if release_age < 50:
+                        if release_age < ALLOW_VG['minimum_age']:
                             continue
-                        if seller_rating < 99.0:
+                        if seller_rating < ALLOW_VG['minimum_seller_rating']:
                             continue
+
+                    summary = (
+                        f'<b>{summarize_discount(discount_from_median)}'
+                        f' median ({round(median_price, 2)})</b><br>'
+                        f'{summarize_discount(discount_from_suggested)}'
+                        f' suggested ({round(suggested_price, 2)})<br>'
+                        f'{entry.summary.value}'
+                    )
 
                     yield {
                         'id': entry.id_,
                         'title': entry.title.value,
                         'updated': isoformat(entry.updated),
-                        'summary': ('<b>%s%% below median</b><br>%s'
-                                    % (discount, entry.summary.value)),
+                        'summary': summary,
                     }
 
                 except DealException as e:
                     log_error(e, entry)
-                except requests.exceptions.RequestException:
-                    pass
+                except requests.exceptions.RequestException as e:
+                    debug(e)
 
 
 def condition(arg):
@@ -226,9 +247,10 @@ def currency(arg):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("condition", type=condition)
-parser.add_argument("currency", type=currency)
-parser.add_argument("outfile")
+parser.add_argument('condition', type=condition)
+parser.add_argument('currency', type=currency)
+parser.add_argument('minimum_discount', type=int)
+parser.add_argument('outfile')
 
 args = parser.parse_args()
 
@@ -238,9 +260,9 @@ try:
     fg.title('Discogs Deals')
     fg.updated(now())
     fg.link(href=FEED_URL, rel='self')
-    fg.author({'name': 'Ryan Shaw', 'email': 'rieyin@icloud.com'})
+    fg.author(FEED_AUTHOR)
 
-    for deal in find_deals(args.condition, args.currency):
+    for deal in get_deals(args.condition, args.currency, args.minimum_discount):
         fe = fg.add_entry()
         fe.id(deal['id'])
         fe.title(deal['title'])
@@ -248,9 +270,9 @@ try:
         fe.link(href=deal['id'])
         fe.content(deal['summary'], type='html')
 
-    fg.atom_file(args.outfile)
+    fg.atom_file(args.outfile, pretty=True)
 
 except DealException as e:
     log_error(e)
-except requests.exceptions.RequestException:
-    pass
+except requests.exceptions.RequestException as e:
+    debug(e)
