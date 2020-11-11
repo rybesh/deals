@@ -32,12 +32,14 @@ class DealException(Exception):
 
 
 def log_error(e, entry=None):
-    msg = (
-        f'{entry.id_}/n' if entry else ''
-        f'{entry.title.value}/n' if entry else ''
-        f'{e}',
-        f' ({e.status_code})\n' if e.status_code else '\n'
-    )
+    if entry is None:
+        msg = str(e)
+    else:
+        msg = (
+            f'{entry.id_}\n'
+            f'{entry.title.value}\n'
+            f'{e}'
+        )
     if not e.status_code == 502:
         print(msg, file=stderr)
 
@@ -62,7 +64,9 @@ def call_api(endpoint, params={}):
         debug('sleeping...')
         sleep(10)
     if not r.status_code == 200:
-        raise DealException(f'GET {r.url} failed', r.status_code)
+        raise DealException(
+            f'GET {r.url} failed ({r.status_code})',
+            r.status_code)
     return r.json()
 
 
@@ -71,7 +75,9 @@ def call_api(endpoint, params={}):
 def get(url):
     r = requests.get(url, timeout=10)
     if not r.status_code == 200:
-        raise DealException(f'GET {r.url} failed', r.status_code)
+        raise DealException(
+            f'GET {r.url} failed ({r.status_code})',
+            r.status_code)
     r.encoding = 'UTF-8'
     return r.text
 
