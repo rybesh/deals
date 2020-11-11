@@ -38,7 +38,7 @@ def log_error(e, entry=None):
         msg = (
             f'{entry.id_}\n'
             f'{entry.title.value}\n'
-            f'{e}'
+            f'{e}\n'
         )
     if not e.status_code == 502:
         print(msg, file=stderr)
