@@ -40,7 +40,7 @@ def log_error(e, entry=None):
             f'{entry.title.value}\n'
             f'{e}\n'
         )
-    if not e.status_code == 502:
+    if e.status_code not in (404, 502):
         print(msg, file=stderr)
 
 
