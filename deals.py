@@ -58,7 +58,7 @@ def call_api(endpoint, params={}):
         headers={'Authorization': f'Discogs token={TOKEN}'},
         timeout=10,
     )
-    calls_remaining = int(r.headers['X-Discogs-Ratelimit-Remaining'])
+    calls_remaining = int(r.headers.get('X-Discogs-Ratelimit-Remaining', 0))
     debug(f'{calls_remaining} calls remaining')
     if calls_remaining < 5:
         debug('sleeping...')
