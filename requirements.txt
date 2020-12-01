@@ -1,4 +1,4 @@
 atoma==0.0.17
 feedgen==0.9.0
 ratelimit==2.2.1
-requests==2.24.0
+requests==2.25.0
