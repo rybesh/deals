@@ -117,7 +117,9 @@ def get_median_price(release_html):
 
 
 def get_release_year(listing):
-    return listing['release'].get('year', date.today().year)
+    # Discogs API uses 0 for unknown year
+    year = listing['release'].get('year', 0)
+    return date.today().year if year == 0 else year
 
 
 def discount(price, benchmark):
