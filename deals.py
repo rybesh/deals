@@ -174,24 +174,13 @@ def get_deals(conditions, currencies, minimum_discount):
                     release_url = f'{WWW}/release/{release_id}'
                     median_price = get_median_price(get(release_url))
                     suggested_price = get_suggested_price(release_id, condition)
-
-                    if median_price is None:
-                        continue
+                    has_sold = True
 
                     if price is None:
                         continue
 
                     # adjust price for standard domestic shipping
                     price = price - STANDARD_SHIPPING
-
-                    if not price < median_price:
-                        continue
-
-                    discount_from_median = discount(price, median_price)
-                    discount_from_suggested = discount(price, suggested_price)
-
-                    if discount_from_median < minimum_discount:
-                        continue
 
                     release_age = date.today().year - release_year
 
@@ -201,25 +190,51 @@ def get_deals(conditions, currencies, minimum_discount):
                         if seller_rating < ALLOW_VG['minimum_seller_rating']:
                             continue
 
+                    if median_price is None:
+                        has_sold = False
+
+                    if has_sold:
+                        if not price < median_price:
+                            continue
+
+                        discount_from_median = discount(
+                            price, median_price)
+                        discount_from_suggested = discount(
+                            price, suggested_price)
+
+                        if discount_from_median < minimum_discount:
+                            continue
+
                     debug(
                         f'\n{entry.title.value}\n'
                         f'{entry.summary.value}\n'
                         f'price: ${price:.2f}\n'
-                        f'median price: ${median_price:.2f}\n'
-                        f'suggested price: ${suggested_price:.2f}\n'
                         f'seller rating: {seller_rating:.1f}\n'
-                        f'release year: {release_year}\n'
-                        f'discount from median: {discount_from_median}%\n'
-                        f'discount from suggested: {discount_from_suggested}%\n'
+                        f'release year: {release_year}'
                     )
 
-                    summary = (
-                        f'<b>{summarize_discount(discount_from_median)}'
-                        f' median price (${median_price:.2f})</b><br>'
-                        f'{summarize_discount(discount_from_suggested)}'
-                        f' suggested price (${suggested_price:.2f})<br><br>'
-                        f'{entry.summary.value}'
-                    )
+                    if has_sold:
+                        debug(
+                            f'median price: ${median_price:.2f}\n'
+                            f'suggested price: ${suggested_price:.2f}\n'
+                            f'discount from median: '
+                            f'{discount_from_median}%\n'
+                            f'discount from suggested: '
+                            f'{discount_from_suggested}%\n'
+                        )
+                        summary = (
+                            f'<b>{summarize_discount(discount_from_median)}'
+                            f' median price (${median_price:.2f})</b><br>'
+                            f'{summarize_discount(discount_from_suggested)}'
+                            f' suggested price (${suggested_price:.2f})<br><br>'
+                            f'{entry.summary.value}'
+                        )
+                    else:
+                        debug('never sold\n')
+                        summary = (
+                            f'<b>never sold</b><br><br>'
+                            f'{entry.summary.value}'
+                        )
 
                     yield {
                         'id': entry.id_,
