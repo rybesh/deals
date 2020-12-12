@@ -100,6 +100,13 @@ def get_suggested_price(release_id, condition):
     return suggestions.get(condition, {}).get('value')
 
 
+def get_demand_ratio(release_id):
+    stats = call_api(f'/releases/{release_id}/stats')
+    return (
+        stats['num_want'] / (stats['num_have'] if stats['num_have'] > 0 else 1)
+    )
+
+
 def get_median_price(release_html):
     m = re.search(
         r'<h4>Last Sold:</h4>\n\s+Never',
@@ -176,6 +183,7 @@ def get_deals(conditions, currencies, minimum_discount):
                     release_url = f'{WWW}/release/{release_id}'
                     median_price = get_median_price(get(release_url))
                     suggested_price = get_suggested_price(release_id, condition)
+                    demand_ratio = get_demand_ratio(release_id)
                     has_sold = True
 
                     if price is None:
@@ -204,13 +212,16 @@ def get_deals(conditions, currencies, minimum_discount):
                         discount_from_suggested = discount(
                             price, suggested_price)
 
-                        if discount_from_median < minimum_discount:
+                        minimum = minimum_discount if demand_ratio < 2 else 5
+
+                        if discount_from_median < minimum:
                             continue
 
                     debug(
                         f'\n{entry.title.value}\n'
                         f'{entry.summary.value}\n'
                         f'price: ${price:.2f}\n'
+                        f'demand ratio: {demand_ratio:.1f}\n'
                         f'seller rating: {seller_rating:.1f}\n'
                         f'release year: {release_year}'
                     )
@@ -228,13 +239,15 @@ def get_deals(conditions, currencies, minimum_discount):
                             f'<b>{summarize_discount(discount_from_median)}'
                             f' median price (${median_price:.2f})</b><br>'
                             f'{summarize_discount(discount_from_suggested)}'
-                            f' suggested price (${suggested_price:.2f})<br><br>'
+                            f' suggested price (${suggested_price:.2f})<br>'
+                            f'demand ratio: {demand_ratio:.1f}<br><br>'
                             f'{entry.summary.value}'
                         )
                     else:
                         debug('never sold\n')
                         summary = (
-                            f'<b>never sold</b><br><br>'
+                            f'<b>never sold</b><br>'
+                            f'demand ratio: {demand_ratio:.1f}<br><br>'
                             f'{entry.summary.value}'
                         )
 
