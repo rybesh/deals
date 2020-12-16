@@ -119,7 +119,7 @@ def get_median_price(release_html):
         release_html
     )
     if m is None:
-        raise DealException('median price not found')
+        raise DealException(f'median price not found\n\n{release_html}\n')
     return float(m.group(1).replace(',', ''))
 
 
