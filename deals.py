@@ -3,16 +3,16 @@
 import argparse
 import requests
 import atoma
-import re
+import json
 from sys import stderr
 from time import sleep
-from urllib.parse import urlencode, quote_plus
 from datetime import date, datetime, timezone
 from feedgen.feed import FeedGenerator
 from ratelimit import limits, sleep_and_retry
 from config import (
     ALLOW_VG,
     API,
+    GQL_API,
     CONDITIONS,
     CURRENCIES,
     DEBUG,
@@ -51,7 +51,7 @@ def debug(x):
 
 @sleep_and_retry
 @limits(calls=1, period=1)
-def call_api(endpoint, params={}):
+def call_public_api(endpoint, params={}):
     r = requests.get(
         API + endpoint,
         params=params,
@@ -72,8 +72,38 @@ def call_api(endpoint, params={}):
 
 @sleep_and_retry
 @limits(calls=1, period=1)
-def get(url):
-    r = requests.get(url, timeout=10)
+def call_graphql_api(operation, variables, extensions):
+    r = requests.get(
+        GQL_API,
+        params={
+            'operationName': operation,
+            'variables': json.dumps(variables),
+            'extensions': json.dumps(extensions),
+        },
+        headers={
+            'User-Agent': (
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1_0) '
+                + 'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 '
+                + 'Safari/537.36'
+            ),
+            'Origin': 'https://www.discogs.com',
+            'Referer': 'https://www.discogs.com/',
+        },
+        timeout=10,
+    )
+    if not r.status_code == 200:
+        raise DealException(
+            f'GET {r.url} failed ({r.status_code})',
+            r.status_code)
+    return r.json()
+
+
+def get(url, params={}):
+    r = requests.get(
+        url,
+        params=params,
+        timeout=10,
+    )
     if not r.status_code == 200:
         raise DealException(
             f'GET {r.url} failed ({r.status_code})',
@@ -96,31 +126,51 @@ def get_total_price(listing):
 
 
 def get_suggested_price(release_id, condition):
-    suggestions = call_api(f'/marketplace/price_suggestions/{release_id}')
+    suggestions = call_public_api(
+        f'/marketplace/price_suggestions/{release_id}'
+    )
     return suggestions.get(condition, {}).get('value')
 
 
 def get_demand_ratio(release_id):
-    stats = call_api(f'/releases/{release_id}/stats')
+    stats = call_public_api(f'/releases/{release_id}/stats')
     return (
         stats['num_want'] / (stats['num_have'] if stats['num_have'] > 0 else 1)
     )
 
 
-def get_median_price(release_html):
-    m = re.search(
-        r'<h4>Last Sold:</h4>\n\s+Never',
-        release_html
+def get_price_statistics(release_id):
+    o = call_graphql_api(
+        'ReleaseStatsPrices',
+        {'discogsId': release_id, 'currency': 'USD'},
+        {'persistedQuery': {
+            'version': 1,
+            'sha256Hash':
+            'f1222b0b90f95a8cd645e4e48049be3385587ce6808c9364f812af761d44d66f'
+        }}
     )
-    if m is not None:
-        return None
-    m = re.search(
-        r'<h4>Median:</h4>\n\s+\$((?:\d+,)*\d+\.\d{2})\n',
-        release_html
-    )
-    if m is None:
-        raise DealException(f'median price not found\n\n{release_html}\n')
-    return float(m.group(1).replace(',', ''))
+
+    def error(message):
+        j = json.dumps(o, indent=2, sort_keys=True)
+        raise DealException(f'{message}\n\n{j}\n')
+
+    statistics = o.get('data', {}).get('release', {}).get('statistics', {})
+
+    if any(x not in statistics for x in ('min', 'median', 'max')):
+        error('missing price statistics')
+
+    prices = (statistics[x] for x in ('min', 'median', 'max'))
+    amounts = []
+    for price in prices:
+        if price is None:
+            amounts.append(price)  # not sold yet
+        else:
+            amount = price.get('converted', {}).get('amount')
+            if amount is None:
+                error('missing amount')
+            else:
+                amounts.append(amount)
+    return amounts
 
 
 def get_release_year(listing):
@@ -129,18 +179,18 @@ def get_release_year(listing):
     return date.today().year if year == 0 else year
 
 
-def discount(price, benchmark):
+def difference(price, benchmark):
     if benchmark is None:
         return None
     else:
         return round((benchmark - price) / benchmark * 100)
 
 
-def summarize_discount(discount):
-    if discount > 0:
-        return f'{discount}% below'
-    elif discount < 0:
-        return f'{-discount}% above'
+def summarize_difference(difference):
+    if difference > 0:
+        return f'{difference}% below'
+    elif difference < 0:
+        return f'{-difference}% above'
     else:
         return 'same as'
 
@@ -158,6 +208,7 @@ def get_deals(conditions, currencies, minimum_discount):
     for condition in args.condition:
         for currency in args.currency:
 
+            wantlist_url = f'{WWW}/sell/mpmywantsrss'
             wantlist_params = {
                 'output': 'rss',
                 'user': DISCOGS_USER,
@@ -165,23 +216,23 @@ def get_deals(conditions, currencies, minimum_discount):
                 'currency': currency,
                 'hours_range': '0-12',
             }
-            wantlist_url = (
-                f'{WWW}/sell/mpmywantsrss?'
-                f'{urlencode(wantlist_params, quote_via=quote_plus)}'
+            feed = atoma.parse_atom_bytes(
+                get(wantlist_url, wantlist_params).encode('utf8')
             )
-
-            feed = atoma.parse_atom_bytes(get(wantlist_url).encode('utf8'))
 
             for entry in feed.entries:
                 try:
                     listing_id = entry.id_.split('/')[-1]
-                    listing = call_api(f'/marketplace/listings/{listing_id}')
+                    listing = call_public_api(
+                        f'/marketplace/listings/{listing_id}'
+                    )
                     seller_rating = get_seller_rating(listing)
                     price = get_total_price(listing)
                     release_year = get_release_year(listing)
                     release_id = listing['release']['id']
-                    release_url = f'{WWW}/release/{release_id}'
-                    median_price = get_median_price(get(release_url))
+                    min_price, median_price, max_price = get_price_statistics(
+                        release_id
+                    )
                     suggested_price = get_suggested_price(release_id, condition)
                     demand_ratio = get_demand_ratio(release_id)
                     has_sold = True
@@ -207,14 +258,18 @@ def get_deals(conditions, currencies, minimum_discount):
                         if not price < median_price:
                             continue
 
-                        discount_from_median = discount(
+                        difference_from_median = difference(
                             price, median_price)
-                        discount_from_suggested = discount(
+                        difference_from_suggested = difference(
                             price, suggested_price)
+                        difference_from_min = difference(
+                            price, min_price)
+                        difference_from_max = difference(
+                            price, max_price)
 
                         minimum = minimum_discount if demand_ratio < 2 else 5
 
-                        if discount_from_median < minimum:
+                        if difference_from_median < minimum:
                             continue
 
                     debug(
@@ -230,16 +285,26 @@ def get_deals(conditions, currencies, minimum_discount):
                         debug(
                             f'median price: ${median_price:.2f}\n'
                             f'suggested price: ${suggested_price:.2f}\n'
-                            f'discount from median: '
-                            f'{discount_from_median}%\n'
-                            f'discount from suggested: '
-                            f'{discount_from_suggested}%\n'
+                            f'lowest price: ${min_price:.2f}\n'
+                            f'highest price: ${max_price:.2f}\n'
+                            f'difference from median: '
+                            f'{difference_from_median}%\n'
+                            f'difference from suggested: '
+                            f'{difference_from_suggested}%\n'
+                            f'difference from lowest: '
+                            f'{difference_from_min}%\n'
+                            f'difference from highest: '
+                            f'{difference_from_max}%\n'
                         )
                         summary = (
-                            f'<b>{summarize_discount(discount_from_median)}'
+                            f'<b>{summarize_difference(difference_from_median)}'
                             f' median price (${median_price:.2f})</b><br>'
-                            f'{summarize_discount(discount_from_suggested)}'
+                            f'{summarize_difference(difference_from_suggested)}'
                             f' suggested price (${suggested_price:.2f})<br>'
+                            f'{summarize_difference(difference_from_min)}'
+                            f' min price (${min_price:.2f})<br>'
+                            f'{summarize_difference(difference_from_max)}'
+                            f' max price (${max_price:.2f})<br>'
                             f'demand ratio: {demand_ratio:.1f}<br><br>'
                             f'{entry.summary.value}'
                         )
