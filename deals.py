@@ -154,7 +154,15 @@ def get_price_statistics(release_id):
         j = json.dumps(o, indent=2, sort_keys=True)
         raise DealException(f'{message}\n\n{j}\n')
 
-    statistics = o.get('data', {}).get('release', {}).get('statistics', {})
+    data = o.get('data', {})
+    if data is None:
+        error('missing data value')
+
+    release = data.get('release', {})
+    if release is None:
+        error('missing release value')
+
+    statistics = release.get('statistics', {})
 
     if any(x not in statistics for x in ('min', 'median', 'max')):
         error('missing price statistics')
