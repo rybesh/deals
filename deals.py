@@ -141,12 +141,12 @@ def get_demand_ratio(release_id):
 
 def get_price_statistics(release_id):
     o = call_graphql_api(
-        'ReleaseStatsPrices',
+        'ReleaseMarketplaceData',
         {'discogsId': release_id, 'currency': 'USD'},
         {'persistedQuery': {
             'version': 1,
             'sha256Hash':
-            'f1222b0b90f95a8cd645e4e48049be3385587ce6808c9364f812af761d44d66f'
+            '40d4785724fd907ceba00f3d59422e06edcdb945900a55cfb3b57bee4528f6a3'
         }}
     )
 
