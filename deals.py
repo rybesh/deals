@@ -70,6 +70,10 @@ def call_public_api(endpoint, params={}):
     return r.json()
 
 
+def dump(o):
+    return json.dumps(o, separators=(',', ':'))
+
+
 @sleep_and_retry
 @limits(calls=1, period=1)
 def call_graphql_api(operation, variables, extensions):
@@ -77,8 +81,8 @@ def call_graphql_api(operation, variables, extensions):
         GQL_API,
         params={
             'operationName': operation,
-            'variables': json.dumps(variables),
-            'extensions': json.dumps(extensions),
+            'variables': dump(variables),
+            'extensions': dump(extensions),
         },
         headers={
             'User-Agent': (
