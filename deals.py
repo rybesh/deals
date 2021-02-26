@@ -1,7 +1,7 @@
 #! ./venv/bin/python3
 
 import argparse
-import requests
+import httpx
 import atoma
 import json
 from sys import stderr
@@ -52,12 +52,12 @@ def debug(x):
 
 @sleep_and_retry
 @limits(calls=1, period=1)
-def call_public_api(endpoint, params={}):
-    r = requests.get(
+def call_public_api(client, endpoint, params={}):
+    r = client.get(
         API + endpoint,
         params=params,
         headers={'Authorization': f'Discogs token={TOKEN}'},
-        timeout=10,
+        timeout=10.0,
     )
     calls_remaining = int(r.headers.get('X-Discogs-Ratelimit-Remaining', 0))
     debug(f'{calls_remaining} calls remaining')
@@ -77,8 +77,8 @@ def dump(o):
 
 @sleep_and_retry
 @limits(calls=1, period=1)
-def call_graphql_api(operation, variables, extensions):
-    r = requests.get(
+def call_graphql_api(client, operation, variables, extensions):
+    r = client.get(
         GQL_API,
         params={
             'operationName': operation,
@@ -94,7 +94,7 @@ def call_graphql_api(operation, variables, extensions):
             'Origin': 'https://www.discogs.com',
             'Referer': 'https://www.discogs.com/',
         },
-        timeout=10,
+        timeout=10.0,
     )
     if not r.status_code == 200:
         raise DealException(
@@ -103,17 +103,16 @@ def call_graphql_api(operation, variables, extensions):
     return r.json()
 
 
-def get(url, params={}):
-    r = requests.get(
+def get(client, url, params={}):
+    r = client.get(
         url,
         params=params,
-        timeout=10,
+        timeout=10.0,
     )
     if not r.status_code == 200:
         raise DealException(
             f'GET {r.url} failed ({r.status_code})',
             r.status_code)
-    r.encoding = 'UTF-8'
     return r.text
 
 
@@ -130,22 +129,27 @@ def get_total_price(listing):
         return None
 
 
-def get_suggested_price(release_id, condition):
+def get_suggested_price(client, release_id, condition):
     suggestions = call_public_api(
+        client,
         f'/marketplace/price_suggestions/{release_id}'
     )
     return suggestions.get(condition, {}).get('value')
 
 
-def get_demand_ratio(release_id):
-    stats = call_public_api(f'/releases/{release_id}/stats')
+def get_demand_ratio(client, release_id):
+    stats = call_public_api(
+        client,
+        f'/releases/{release_id}/stats'
+    )
     return (
         stats['num_want'] / (stats['num_have'] if stats['num_have'] > 0 else 1)
     )
 
 
-def get_price_statistics(release_id):
+def get_price_statistics(client, release_id):
     o = call_graphql_api(
+        client,
         'ReleaseMarketplaceData',
         {'discogsId': release_id, 'currency': 'USD'},
         {'persistedQuery': {
@@ -216,7 +220,7 @@ def now():
     return isoformat(datetime.now(timezone.utc))
 
 
-def get_deals(conditions, currencies, minimum_discount):
+def get_deals(client, conditions, currencies, minimum_discount):
 
     for condition in args.condition:
         for currency in args.currency:
@@ -230,13 +234,14 @@ def get_deals(conditions, currencies, minimum_discount):
                 'hours_range': '0-12',
             }
             feed = atoma.parse_atom_bytes(
-                get(wantlist_url, wantlist_params).encode('utf8')
+                get(client, wantlist_url, wantlist_params).encode('utf8')
             )
 
             for entry in feed.entries:
                 try:
                     listing_id = entry.id_.split('/')[-1]
                     listing = call_public_api(
+                        client,
                         f'/marketplace/listings/{listing_id}'
                     )
 
@@ -248,10 +253,15 @@ def get_deals(conditions, currencies, minimum_discount):
                     release_year = get_release_year(listing)
                     release_id = listing['release']['id']
                     min_price, median_price, max_price = get_price_statistics(
+                        client,
                         release_id
                     )
-                    suggested_price = get_suggested_price(release_id, condition)
-                    demand_ratio = get_demand_ratio(release_id)
+                    suggested_price = get_suggested_price(
+                        client,
+                        release_id,
+                        condition
+                    )
+                    demand_ratio = get_demand_ratio(client, release_id)
                     has_sold = True
 
                     if price is None:
@@ -342,7 +352,7 @@ def get_deals(conditions, currencies, minimum_discount):
 
                 except DealException as e:
                     log_error(e, entry)
-                except requests.exceptions.RequestException as e:
+                except httpx.HTTPError as e:
                     debug(e)
 
 
@@ -380,17 +390,24 @@ try:
     fg.link(href=FEED_URL, rel='self')
     fg.author(FEED_AUTHOR)
 
-    for deal in get_deals(args.condition, args.currency, args.minimum_discount):
-        fe = fg.add_entry()
-        fe.id(deal['id'])
-        fe.title(deal['title'])
-        fe.updated(deal['updated'])
-        fe.link(href=deal['id'])
-        fe.content(deal['summary'], type='html')
+    with httpx.Client() as client:
+
+        for deal in get_deals(
+                client,
+                args.condition,
+                args.currency,
+                args.minimum_discount
+        ):
+            fe = fg.add_entry()
+            fe.id(deal['id'])
+            fe.title(deal['title'])
+            fe.updated(deal['updated'])
+            fe.link(href=deal['id'])
+            fe.content(deal['summary'], type='html')
 
     fg.atom_file(args.outfile, pretty=True)
 
 except DealException as e:
     log_error(e)
-except requests.exceptions.RequestException as e:
+except httpx.HTTPError as e:
     debug(e)
