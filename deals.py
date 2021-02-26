@@ -12,6 +12,7 @@ from ratelimit import limits, sleep_and_retry
 from config import (
     ALLOW_VG,
     API,
+    BLOCKED_SELLERS,
     GQL_API,
     CONDITIONS,
     CURRENCIES,
@@ -238,6 +239,10 @@ def get_deals(conditions, currencies, minimum_discount):
                     listing = call_public_api(
                         f'/marketplace/listings/{listing_id}'
                     )
+
+                    if listing['seller']['username'] in BLOCKED_SELLERS:
+                        continue
+
                     seller_rating = get_seller_rating(listing)
                     price = get_total_price(listing)
                     release_year = get_release_year(listing)
