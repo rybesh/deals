@@ -1,4 +1,4 @@
 atoma==0.0.17
 feedgen==0.9.0
-httpx==0.16.1
+httpx==0.17.0
 ratelimit==2.2.1
