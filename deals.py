@@ -155,7 +155,7 @@ def get_price_statistics(client, release_id):
         {'persistedQuery': {
             'version': 1,
             'sha256Hash':
-            '40d4785724fd907ceba00f3d59422e06edcdb945900a55cfb3b57bee4528f6a3'
+            '6416e1ff31367785cbb78a9feb422a0465b0c71049d1bbc899e427e1530a4425'
         }}
     )
 
