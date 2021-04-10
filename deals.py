@@ -138,13 +138,11 @@ def get_suggested_price(client, release_id, condition):
 
 
 def get_demand_ratio(client, release_id):
-    stats = call_public_api(
-        client,
-        f'/releases/{release_id}/stats'
-    )
-    return (
-        stats['num_want'] / (stats['num_have'] if stats['num_have'] > 0 else 1)
-    )
+    o = call_public_api(client, f'/releases/{release_id}')
+    want = o['community']['want']
+    have = o['community']['have']
+
+    return (want / (have if have > 0 else 1))
 
 
 def get_price_statistics(client, release_id):
