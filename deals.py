@@ -328,7 +328,7 @@ def get_deal(
         benchmarked_price = None
     else:
         benchmarked_price = benchmark(price, suggested_price, *price_statistics)
-        minimum = minimum_discount if demand_ratio < 2 else 5
+        minimum = minimum_discount if demand_ratio < 2 else 0
         if benchmarked_price.median.difference < minimum:
             return None
 
