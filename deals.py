@@ -10,6 +10,7 @@ import sys
 from atoma.atom import AtomEntry, AtomFeed
 from datetime import date, datetime, timezone
 from feedgen.feed import FeedGenerator
+from io import StringIO
 from ratelimit import limits, sleep_and_retry
 from rich.console import Console
 from rich.padding import Padding
@@ -353,6 +354,12 @@ def summarize(
 
     summary = console.export_html()
     console.record = False
+
+    # if we're in (fake) quiet mode, clear the capture buffer
+    if type(console.file) is StringIO:
+        console.file.close()
+        console.file = StringIO()
+
     status.start()
 
     console.print(Padding(f"[dim blue]{entry.id_}", (0, 2)))
@@ -663,7 +670,10 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    console = Console(quiet=args.quiet)
+    if args.quiet:
+        console = Console(file=StringIO())
+    else:
+        console = Console()
 
     if args.feed is not None:
 
