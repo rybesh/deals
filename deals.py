@@ -305,10 +305,7 @@ def summarize_benchmarked_price(
     console.print(Padding(grid, (1, 0)))
 
 
-FORMAT = """
-<ignore this="{foreground}{background}{stylesheet}"/>
-<pre><code>{code}</code></pre>
-"""
+FORMAT = "<pre><code>{code}</code></pre>{foreground}{background}{stylesheet}"
 SPAN_OPEN = re.compile(r'<span style="[^"]*">')
 
 
@@ -316,6 +313,7 @@ def export_html(console: Console) -> str:
     html = console.export_html(inline_styles=True, code_format=FORMAT)
     html = SPAN_OPEN.sub("<strong>", html)
     html = html.replace("</span>", "</strong>")
+    html = html.replace("#000000#ffffff", "")
     return html
 
 
