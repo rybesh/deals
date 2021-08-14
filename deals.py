@@ -4,16 +4,20 @@ import argparse
 import os
 import atoma
 import html
+import html5lib
 import httpx
 import json
 import sys
 from atoma.atom import AtomEntry, AtomFeed
 from datetime import date, datetime, timezone
 from feedgen.feed import FeedGenerator
+from html5lib.serializer import serialize
 from io import StringIO
 from ratelimit import limits, sleep_and_retry
+from rich import box
 from rich.console import Console
 from rich.padding import Padding
+from rich.panel import Panel
 from rich.status import Status
 from rich.syntax import Syntax
 from rich.table import Table
@@ -307,6 +311,11 @@ def summarize_benchmarked_price(
         console.print(Padding(grid, (0, 2, 1, 2)))
 
 
+def fix_html(html: str) -> str:
+    e = html5lib.parse(html)
+    return str(serialize(e[1][0][0]))
+
+
 def summarize(
     console: Console,
     status: Status,
@@ -320,11 +329,12 @@ def summarize(
     benchmarked_price: Optional[BenchmarkedPrice],
 ) -> str:
 
+    console.print(Padding(f"[bold blue]{entry.title.value}", (1, 0, 0, 0)))
+
     status.stop()
     console.record = True
 
-    console.print(Padding(f"[bold blue]{entry.title.value}", (1, 0)))
-    console.print(Padding(html.unescape(entry.summary.value), (0, 2, 1, 2)))
+    console.print(Panel(html.unescape(entry.summary.value), width=50, box=box.MINIMAL))
 
     summarize_benchmarked_price(console, benchmarked_price)
 
@@ -352,7 +362,7 @@ def summarize(
 
     console.print(Padding(grid, (0, 2, 1, 2)))
 
-    summary = console.export_html()
+    summary = fix_html(console.export_html(inline_styles=True))
     console.record = False
 
     # if we're in (fake) quiet mode, clear the capture buffer
@@ -370,7 +380,7 @@ def summarize(
             Padding(f"[dim]Listed {entry.updated:%B %-d, %Y %-I:%M%p}", (0, 2, 1, 2)),
         )
 
-    return summary.removeprefix("<!DOCTYPE html>")
+    return summary
 
 
 def meets_criteria(
