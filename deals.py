@@ -370,7 +370,7 @@ def summarize(
             Padding(f"[dim]Listed {entry.updated:%B %-d, %Y %-I:%M%p}", (0, 2, 1, 2)),
         )
 
-    return summary
+    return summary.removeprefix("<!DOCTYPE html>")
 
 
 def meets_criteria(
