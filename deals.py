@@ -711,7 +711,7 @@ def main() -> None:
                 fe.content(deal.summary, type="html")
                 feed_entries += 1
 
-        if fg is not None and feed_entries < MAX_FEED_ENTRIES:
+        if fg is not None and feed is not None and feed_entries < MAX_FEED_ENTRIES:
             for entry in feed.entries:
                 copy_entry(entry, fg)
                 feed_entries += 1
