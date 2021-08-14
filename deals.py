@@ -9,7 +9,7 @@ import json
 import re
 import sys
 from atoma.atom import AtomEntry, AtomFeed
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from feedgen.feed import FeedGenerator
 from io import StringIO
 from ratelimit import limits, sleep_and_retry
@@ -46,7 +46,7 @@ GQLVariables = dict[str, str]
 class Deal(NamedTuple):
     id: str
     title: str
-    updated: str
+    updated: datetime
     summary: str
 
 
@@ -265,12 +265,8 @@ def isoformat(dt: datetime) -> str:
     return dt.isoformat(timespec="seconds")
 
 
-def now() -> str:
-    return isoformat(datetime.now(timezone.utc))
-
-
-def isoformat_dt_or_now(dt: Optional[datetime]) -> str:
-    return now() if dt is None else isoformat(dt)
+def now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def summarize_difference(difference: int) -> str:
@@ -461,7 +457,7 @@ def get_deal(
     return Deal(
         entry.id_,
         entry.title.value,
-        isoformat_dt_or_now(entry.updated),
+        entry.updated or now(),
         summary,
     )
 
@@ -631,7 +627,7 @@ def copy_entry(entry: AtomEntry, fg: FeedGenerator) -> None:
     fe = fg.add_entry(order="append")
     fe.id(entry.id_)
     fe.title(entry.title.value)
-    fe.updated(isoformat_dt_or_now(entry.updated))
+    fe.updated(isoformat(entry.updated or now()))
     fe.link(href=entry.id_)
     fe.content(entry.content.value, type="html")
 
@@ -713,6 +709,8 @@ def main() -> None:
 
     with httpx.Client() as client:
 
+        timestamp = None
+
         for deal in get_deals(
             client,
             console,
@@ -723,11 +721,16 @@ def main() -> None:
             args.skip_never_sold,
             last_updated,
         ):
+            if deal.updated == timestamp:
+                timestamp = deal.updated + timedelta(seconds=1)
+            else:
+                timestamp = deal.updated
+
             if fg is not None and feed_entries < MAX_FEED_ENTRIES:
                 fe = fg.add_entry(order="append")
                 fe.id(deal.id)
                 fe.title(deal.title)
-                fe.updated(deal.updated)
+                fe.updated(isoformat(timestamp))
                 fe.link(href=deal.id)
                 fe.content(deal.summary, type="html")
                 feed_entries += 1
