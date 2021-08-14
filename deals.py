@@ -4,20 +4,17 @@ import argparse
 import os
 import atoma
 import html
-import html5lib
 import httpx
 import json
+import re
 import sys
 from atoma.atom import AtomEntry, AtomFeed
 from datetime import date, datetime, timezone
 from feedgen.feed import FeedGenerator
-from html5lib.serializer import serialize
 from io import StringIO
 from ratelimit import limits, sleep_and_retry
-from rich import box
 from rich.console import Console
 from rich.padding import Padding
-from rich.panel import Panel
 from rich.status import Status
 from rich.syntax import Syntax
 from rich.table import Table
@@ -33,6 +30,7 @@ from config import (
     CURRENCIES,
     DISCOGS_USER,
     FEED_AUTHOR,
+    FEED_DISPLAY_WIDTH,
     FEED_URL,
     MARKETPLACE_QUERY_HASH,
     MAX_FEED_ENTRIES,
@@ -277,9 +275,9 @@ def isoformat_dt_or_now(dt: Optional[datetime]) -> str:
 
 def summarize_difference(difference: int) -> str:
     if difference > 0:
-        return f"{difference:3}% below"
+        return f"{difference}% below"
     elif difference < 0:
-        return f"{-difference:3}% above"
+        return f"{-difference}% above"
     else:
         return "same as"
 
@@ -289,7 +287,7 @@ def summarize_benchmarked_price(
 ) -> None:
 
     if benchmarked_price is None:
-        console.print(Padding("[bold]never sold", (0, 2, 1, 2)))
+        grid = "[bold]never sold"
     else:
         grid = Table.grid(padding=(0, 1))
         grid.add_column(justify="right", no_wrap=True)
@@ -303,17 +301,30 @@ def summarize_benchmarked_price(
                 style = "bold magenta"
             grid.add_row(
                 summarize_difference(benchmark.difference),
-                f"{field} price",
+                f"{field}",
                 f"${benchmark.price:.2f}",
                 style=style,
             )
 
-        console.print(Padding(grid, (0, 2, 1, 2)))
+    console.print(Padding(grid, (1, 0)))
 
 
-def fix_html(html: str) -> str:
-    e = html5lib.parse(html)
-    return str(serialize(e[1][0][0]))
+FORMAT = """
+<ignore this="{foreground}{background}{stylesheet}"/>
+<pre><code>{code}</code></pre>
+"""
+SPAN_OPEN = re.compile(r'<span style="[^"]*">')
+
+
+def export_html(console: Console) -> str:
+    html = console.export_html(inline_styles=True, code_format=FORMAT)
+    html = SPAN_OPEN.sub("<strong>", html)
+    html = html.replace("</span>", "</strong>")
+    return html
+
+
+def abbreviate(condition: str) -> str:
+    return list(CONDITIONS.keys())[list(CONDITIONS.values()).index(condition)]
 
 
 def summarize(
@@ -329,12 +340,12 @@ def summarize(
     benchmarked_price: Optional[BenchmarkedPrice],
 ) -> str:
 
-    console.print(Padding(f"[bold blue]{entry.title.value}", (1, 0, 0, 0)))
+    console.print(Padding(f"[bold blue]{entry.title.value}", (1, 0)))
 
     status.stop()
     console.record = True
 
-    console.print(Panel(html.unescape(entry.summary.value), width=50, box=box.MINIMAL))
+    console.print(html.unescape(entry.summary.value), width=FEED_DISPLAY_WIDTH)
 
     summarize_benchmarked_price(console, benchmarked_price)
 
@@ -343,26 +354,26 @@ def summarize(
     grid.add_column()
 
     grid.add_row(
-        "adjusted price",
-        f"${price:.2f}{' [bold](accepts offers)' if accepts_offers else ''}",
+        "price",
+        f"${price:.2f}{' [bold](offers)' if accepts_offers else ''}",
     )
 
     demand_ratio_text = Text(f"{demand_ratio:.1f}")
     if demand_ratio >= 2:
         demand_ratio_text.stylize("bold magenta")
-    grid.add_row("demand ratio", demand_ratio_text)
+    grid.add_row("demand", demand_ratio_text)
 
     seller_rating_text = Text(f"{seller_rating:.1f}")
     if seller_rating < 99.0:
         seller_rating_text.stylize("red")
-    grid.add_row("seller rating", seller_rating_text)
+    grid.add_row("rating", seller_rating_text)
 
-    grid.add_row("release year", str(release_year))
-    grid.add_row("condition", condition)
+    grid.add_row("year", str(release_year))
+    grid.add_row("condition", abbreviate(condition))
 
-    console.print(Padding(grid, (0, 2, 1, 2)))
+    console.print(grid, width=FEED_DISPLAY_WIDTH)
 
-    summary = fix_html(console.export_html(inline_styles=True))
+    summary = export_html(console)
     console.record = False
 
     # if we're in (fake) quiet mode, clear the capture buffer
@@ -372,13 +383,13 @@ def summarize(
 
     status.start()
 
-    console.print(Padding(f"[dim blue]{entry.id_}", (0, 2)))
+    console.print()
+    console.print(f"[dim blue]{entry.id_}")
     if entry.updated is None:
         console.print()
     else:
-        console.print(
-            Padding(f"[dim]Listed {entry.updated:%B %-d, %Y %-I:%M%p}", (0, 2, 1, 2)),
-        )
+        console.print(f"[dim]Listed {entry.updated:%B %-d, %Y %-I:%M%p}")
+    console.print()
 
     return summary
 
