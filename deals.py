@@ -19,6 +19,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 from time import sleep
+from tendo.singleton import SingleInstance, SingleInstanceException
 from typing import Iterator, NamedTuple, Optional
 from config import (
     ALLOW_VG,
@@ -712,6 +713,9 @@ def main() -> None:
 
 if __name__ == "__main__":
     try:
+        me = SingleInstance()
         main()
+    except SingleInstanceException as e:
+        sys.exit(e)
     except KeyboardInterrupt:
         sys.exit(0)

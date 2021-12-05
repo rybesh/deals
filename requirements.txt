@@ -3,3 +3,4 @@ feedgen==0.9.0
 httpx==0.21.1
 ratelimit==2.2.1
 rich==10.15.2
+tendo==0.2.15
