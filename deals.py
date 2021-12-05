@@ -5,7 +5,6 @@ import os
 import atoma
 import html
 import httpx
-import json
 import re
 import sys
 from atoma.atom import AtomEntry, AtomFeed
@@ -25,14 +24,12 @@ from config import (
     ALLOW_VG,
     API,
     BLOCKED_SELLERS,
-    GQL_API,
     CONDITIONS,
     CURRENCIES,
     DISCOGS_USER,
     FEED_AUTHOR,
     FEED_DISPLAY_WIDTH,
     FEED_URL,
-    MARKETPLACE_QUERY_HASH,
     MAX_FEED_ENTRIES,
     STANDARD_SHIPPING,
     TIMEOUT,
@@ -117,38 +114,6 @@ def call_public_api(client: httpx.Client, endpoint: str) -> dict:
     return r.json()
 
 
-def dump(o: dict) -> str:
-    return json.dumps(o, separators=(",", ":"))
-
-
-@sleep_and_retry
-@limits(calls=1, period=1)
-def call_graphql_api(
-    client: httpx.Client, operation: str, variables: GQLVariables, extensions: dict
-) -> dict:
-    r = client.get(
-        GQL_API,
-        params={
-            "operationName": operation,
-            "variables": dump(variables),
-            "extensions": dump(extensions),
-        },
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1_0) "
-                + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 "
-                + "Safari/537.36"
-            ),
-            "Origin": "https://www.discogs.com",
-            "Referer": "https://www.discogs.com/",
-        },
-        timeout=TIMEOUT,
-    )
-    if not r.status_code == 200:
-        raise DealException(f"GET {r.url} failed ({r.status_code})", r.status_code)
-    return r.json()
-
-
 @sleep_and_retry
 @limits(calls=1, period=1)
 def get(client: httpx.Client, url: str, params: Optional[dict] = None) -> str:
@@ -195,49 +160,42 @@ def get_demand_ratio(client: httpx.Client, release_id: str) -> float:
     return want / (have if have > 0 else 1)
 
 
+VALUE = r"(?:(?:\$((?:\d+,)*\d+\.\d{2}))|--)"
+
+patterns = (
+    re.compile(fr"<li><h4>Lowest<!-- -->:</h4><span>{VALUE}</span></li>"),
+    re.compile(fr"<li><h4>Median<!-- -->:</h4><span>{VALUE}</span></li>"),
+    re.compile(fr"<li><h4>Highest<!-- -->:</h4><span>{VALUE}</span></li>"),
+)
+
+
+def float_value_of(price: str) -> float:
+    return float(price.replace(",", ""))
+
+
 def get_price_statistics(
     client: httpx.Client, release_id: str
 ) -> Optional[tuple[float, float, float]]:
-    o = call_graphql_api(
-        client,
-        "ReleaseMarketplaceData",
-        {"discogsId": release_id, "currency": "USD"},
-        {
-            "persistedQuery": {
-                "version": 1,
-                "sha256Hash": MARKETPLACE_QUERY_HASH,
-            }
-        },
-    )
 
-    def error(message: str):
-        raise DealException(message, json=json.dumps(o, indent=2, sort_keys=True))
+    release_url = f"https://www.discogs.com/release/{release_id}"
+    html = get(client, release_url)
 
-    data = o.get("data", {})
-    if data is None:
-        error("missing data value")
+    def extract(pattern: re.Pattern):
+        m = pattern.search(html)
+        if m is None:
+            raise DealException(f"cannot find price statistics in {release_url}")
+        return m.group(1)
 
-    release = data.get("release", {})
-    if release is None:
-        error("missing release value")
-
-    statistics = release.get("statistics", {})
-
-    if any(stat not in statistics for stat in ("min", "median", "max")):
-        error("missing price statistics")
-
-    prices = [statistics[x] for x in ("min", "median", "max")]
+    prices = tuple(extract(pattern) for pattern in patterns)
 
     if any(price is None for price in prices):
         return None  # not sold yet
 
-    def get_amount(price: dict) -> float:
-        amount = price.get("converted", {}).get("amount")
-        if amount is None:
-            error("missing amount")
-        return float(amount)
-
-    return (get_amount(prices[0]), get_amount(prices[1]), get_amount(prices[2]))
+    return (
+        float_value_of(prices[0]),
+        float_value_of(prices[1]),
+        float_value_of(prices[2]),
+    )
 
 
 def get_release_year(listing: dict) -> int:
