@@ -588,6 +588,18 @@ def copy_entry(entry: AtomEntry, fg: FeedGenerator) -> None:
     fe.content(entry.content.value, type="html")
 
 
+def copy_remaining_entries(
+    feed: Optional[AtomFeed], fg: Optional[FeedGenerator], feed_entries: int
+) -> None:
+    if fg is not None and feed is not None:
+        for entry in feed.entries:
+            if feed_entries < MAX_FEED_ENTRIES:
+                copy_entry(entry, fg)
+                feed_entries += 1
+            else:
+                break
+
+
 def main() -> None:
 
     parser = argparse.ArgumentParser()
@@ -691,13 +703,11 @@ def main() -> None:
                 fe.content(deal.summary, type="html")
                 feed_entries += 1
 
-        if fg is not None and feed is not None and feed_entries < MAX_FEED_ENTRIES:
-            for entry in feed.entries:
-                copy_entry(entry, fg)
-                feed_entries += 1
+        copy_remaining_entries(feed, fg, feed_entries)
 
     if fg is not None:
-        fg.atom_file(args.feed, pretty=True)
+        fg.atom_file(f"{args.feed}.new", pretty=True)
+        os.rename(f"{args.feed}.new", args.feed)
 
 
 if __name__ == "__main__":
