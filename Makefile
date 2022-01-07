@@ -8,7 +8,7 @@ $(PYTHON):
 	$(PIP) install -r requirements.txt
 
 run: $(PYTHON)
-	time ./deals.py all all 0 atom.xml
+	time ./deals.py -c all -$$ all -m 0 -f atom.xml
 
 clean:
 	rm -rf venv
