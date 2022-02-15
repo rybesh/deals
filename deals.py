@@ -199,10 +199,10 @@ def get_price_statistics(
     )
 
 
-def get_release_year(listing: dict) -> int:
+def get_release_year(listing: dict) -> Optional[int]:
     # Discogs API uses 0 for unknown year
     year = listing["release"].get("year", 0)
-    return date.today().year if year == 0 else year
+    return None if year == 0 else year
 
 
 def difference(price: float, benchmark: float) -> Benchmark:
@@ -288,7 +288,7 @@ def summarize(
     accepts_offers: bool,
     demand_ratio: float,
     seller_rating: float,
-    release_year: int,
+    release_year: Optional[int],
     condition: str,
     benchmarked_price: Optional[BenchmarkedPrice],
 ) -> str:
@@ -321,7 +321,7 @@ def summarize(
         seller_rating_text.stylize("red")
     grid.add_row("rating", seller_rating_text)
 
-    grid.add_row("year", str(release_year))
+    grid.add_row("year", "unknown" if release_year is None else str(release_year))
     grid.add_row("condition", abbreviate(condition))
 
     console.print(grid, width=FEED_DISPLAY_WIDTH)
@@ -377,7 +377,7 @@ def get_deal(
     accepts_offers: bool,
     condition: str,
     seller_rating: float,
-    release_year: int,
+    release_year: Optional[int],
     minimum_discount: int,
     skip_never_sold: bool,
 ) -> Optional[Deal]:
@@ -435,7 +435,11 @@ def process_listing(
         seller_rating = get_seller_rating(listing)
         price = get_total_price(listing)
         release_year = get_release_year(listing)
-        release_age = date.today().year - release_year
+        release_age = (
+            ALLOW_VG["minimum_age"]
+            if release_year is None
+            else date.today().year - release_year
+        )
         accepts_offers = listing.get("allow_offers", False)
 
         if meets_criteria(
