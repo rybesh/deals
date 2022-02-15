@@ -164,9 +164,9 @@ def get_demand_ratio(client: httpx.Client, release_id: str) -> float:
 VALUE = r"(?:(?:\$((?:\d+,)*\d+\.\d{2}))|--)"
 
 patterns = (
-    re.compile(fr"<li><h4>Lowest<!-- -->:</h4><span>{VALUE}</span></li>"),
-    re.compile(fr"<li><h4>Median<!-- -->:</h4><span>{VALUE}</span></li>"),
-    re.compile(fr"<li><h4>Highest<!-- -->:</h4><span>{VALUE}</span></li>"),
+    re.compile(rf"<li><h4>Lowest<!-- -->:</h4><span>{VALUE}</span></li>"),
+    re.compile(rf"<li><h4>Median<!-- -->:</h4><span>{VALUE}</span></li>"),
+    re.compile(rf"<li><h4>Highest<!-- -->:</h4><span>{VALUE}</span></li>"),
 )
 
 
