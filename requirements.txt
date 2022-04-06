@@ -2,5 +2,5 @@ atoma==0.0.17
 feedgen==0.9.0
 httpx==0.22.0
 ratelimit==2.2.1
-rich==12.0.1
+rich==12.2.0
 tendo==0.2.15
