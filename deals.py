@@ -8,7 +8,7 @@ import httpx
 import re
 import sys
 from atoma.atom import AtomEntry, AtomFeed
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timezone
 from feedgen.feed import FeedGenerator
 from io import StringIO
 from ratelimit import limits, sleep_and_retry
@@ -594,13 +594,15 @@ def copy_entry(entry: AtomEntry, fg: FeedGenerator) -> None:
 
 
 def copy_remaining_entries(
-    feed: Optional[AtomFeed], fg: Optional[FeedGenerator], feed_entries: int
+    feed: Optional[AtomFeed], fg: FeedGenerator, feed_entries: int, deal_ids: set[str]
 ) -> None:
-    if fg is not None and feed is not None:
+    if feed is not None:
         for entry in feed.entries:
             if feed_entries < MAX_FEED_ENTRIES:
-                copy_entry(entry, fg)
-                feed_entries += 1
+                if entry.id_ not in deal_ids:
+                    deal_ids.add(entry.id_)
+                    copy_entry(entry, fg)
+                    feed_entries += 1
             else:
                 break
 
@@ -656,6 +658,7 @@ def main() -> None:
     fg = None
     feed = None
     feed_entries = 0
+    deal_ids = set()
     last_updated = None
 
     args = parser.parse_args()
@@ -682,8 +685,6 @@ def main() -> None:
 
     with httpx.Client() as client:
 
-        timestamp = None
-
         for deal in get_deals(
             client,
             console,
@@ -694,23 +695,19 @@ def main() -> None:
             args.skip_never_sold,
             last_updated,
         ):
-            if deal.updated == timestamp:
-                timestamp = deal.updated + timedelta(seconds=1)
-            else:
-                timestamp = deal.updated
-
             if fg is not None and feed_entries < MAX_FEED_ENTRIES:
-                fe = fg.add_entry(order="append")
-                fe.id(deal.id)
-                fe.title(deal.title)
-                fe.updated(isoformat(timestamp))
-                fe.link(href=deal.id)
-                fe.content(deal.summary, type="html")
-                feed_entries += 1
-
-        copy_remaining_entries(feed, fg, feed_entries)
+                if deal.id not in deal_ids:
+                    deal_ids.add(deal.id)
+                    fe = fg.add_entry(order="append")
+                    fe.id(deal.id)
+                    fe.title(deal.title)
+                    fe.updated(isoformat(deal.updated))
+                    fe.link(href=deal.id)
+                    fe.content(deal.summary, type="html")
+                    feed_entries += 1
 
     if fg is not None:
+        copy_remaining_entries(feed, fg, feed_entries, deal_ids)
         fg.atom_file(f"{args.feed}.new", pretty=True)
         os.rename(f"{args.feed}.new", args.feed)
 
