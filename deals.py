@@ -72,6 +72,10 @@ class DealException(Exception):
         self.json = json
 
 
+def is_quiet(console: Console) -> bool:
+    return type(console.file) is StringIO
+
+
 def handle_deal_exception(
     console: Console, e: DealException, entry: Optional[AtomEntry] = None
 ) -> None:
@@ -80,11 +84,12 @@ def handle_deal_exception(
     else:
         msg = f"{entry.id_}\n" f"{entry.title.value}\n" f"{e}"
 
-    if console.quiet:
+    if is_quiet(console):
         if e.status_code is None or e.status_code not in (404, 500, 502, 503):
             print(msg, file=sys.stderr)
             if e.json is not None:
                 print(f"\n{e.json}", file=sys.stderr)
+            print(file=sys.stderr)
     else:
         console.rule(style="red")
         console.print(f"[red]{msg}")
@@ -330,7 +335,7 @@ def summarize(
     console.record = False
 
     # if we're in (fake) quiet mode, clear the capture buffer
-    if type(console.file) is StringIO:
+    if is_quiet(console):
         console.file.close()
         console.file = StringIO()
 
