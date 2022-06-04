@@ -5,6 +5,7 @@ import os
 import atoma
 import html
 import httpx
+import logging
 import re
 import sys
 from atoma.atom import AtomEntry, AtomFeed
@@ -719,6 +720,8 @@ def main() -> None:
 
 if __name__ == "__main__":
     try:
+        logger = logging.getLogger("tendo.singleton")
+        logger.setLevel(logging.CRITICAL)
         me = SingleInstance()
         main()
     except SingleInstanceException:
