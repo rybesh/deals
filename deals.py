@@ -727,4 +727,4 @@ if __name__ == "__main__":
     except SingleInstanceException:
         sys.exit(0)
     except KeyboardInterrupt:
-        sys.exit(0)
+        sys.exit(130)
