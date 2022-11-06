@@ -2,3 +2,7 @@
 line-length = 88
 target-version = ['py39']
 include = '\.pyi?$'
+
+[tool.pyright]
+venv = "venv"
+venvPath = "."
