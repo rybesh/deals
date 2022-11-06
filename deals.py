@@ -159,10 +159,9 @@ def get_suggested_price(
     return suggestions.get(condition, {}).get("value")
 
 
-def get_demand_ratio(client: httpx.Client, release_id: str) -> float:
-    o = call_public_api(client, f"/releases/{release_id}")
-    want = o["community"]["want"]
-    have = o["community"]["have"]
+def get_demand_ratio(release: dict) -> float:
+    want = release["community"]["want"]
+    have = release["community"]["have"]
 
     return want / (have if have > 0 else 1)
 
@@ -359,15 +358,18 @@ def meets_criteria(
     price: Optional[float],
     condition: str,
     release_age: int,
+    release_genres: set[str],
     seller_rating: float,
 ) -> bool:
     if price is None or seller in BLOCKED_SELLERS:
         return False
 
     if condition == CONDITIONS["VG+"]:
+        if seller_rating < ALLOW_VG["minimum_seller_rating"]:
+            return False
         if (
             release_age < ALLOW_VG["minimum_age"]
-            or seller_rating < ALLOW_VG["minimum_seller_rating"]
+            and len(release_genres.intersection(ALLOW_VG["genres"])) == 0
         ):
             return False
 
@@ -387,6 +389,7 @@ def get_deal(
     release_year: Optional[int],
     minimum_discount: int,
     skip_never_sold: bool,
+    demand_ratio: float,
 ) -> Optional[Deal]:
 
     # adjust price for standard domestic shipping
@@ -394,7 +397,6 @@ def get_deal(
 
     price_statistics = get_price_statistics(client, release_id)
     suggested_price = get_suggested_price(client, release_id, condition)
-    demand_ratio = get_demand_ratio(client, release_id)
 
     if price_statistics is None or suggested_price is None:
         benchmarked_price = None
@@ -439,18 +441,26 @@ def process_listing(
         listing_id = entry.id_.split("/")[-1]
         listing = call_public_api(client, f"/marketplace/listings/{listing_id}")
         release_id = listing["release"]["id"]
+        release = call_public_api(client, f"/releases/{release_id}")
         seller_rating = get_seller_rating(listing)
         price = get_total_price(listing)
         release_year = get_release_year(listing)
+        release_genres = set(release["genres"])
         release_age = (
             ALLOW_VG["minimum_age"]
             if release_year is None
             else date.today().year - release_year
         )
         accepts_offers = listing.get("allow_offers", False)
+        demand_ratio = get_demand_ratio(release)
 
         if meets_criteria(
-            listing["seller"]["username"], price, condition, release_age, seller_rating
+            listing["seller"]["username"],
+            price,
+            condition,
+            release_age,
+            release_genres,
+            seller_rating,
         ):
             assert price is not None
 
@@ -467,6 +477,7 @@ def process_listing(
                 release_year,
                 minimum_discount,
                 skip_never_sold,
+                demand_ratio,
             )
 
     except DealException as e:
