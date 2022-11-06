@@ -304,7 +304,8 @@ def summarize(
     status.stop()
     console.record = True
 
-    console.print(html.unescape(entry.summary.value), width=FEED_DISPLAY_WIDTH)
+    if entry.summary is not None:
+        console.print(html.unescape(entry.summary.value), width=FEED_DISPLAY_WIDTH)
 
     summarize_benchmarked_price(console, benchmarked_price)
 
@@ -596,7 +597,8 @@ def copy_entry(entry: AtomEntry, fg: FeedGenerator) -> None:
     fe.title(entry.title.value)
     fe.updated(isoformat(entry.updated or now()))
     fe.link(href=entry.id_)
-    fe.content(entry.content.value, type="html")
+    if entry.content is not None:
+        fe.content(entry.content.value, type="html")
 
 
 def copy_remaining_entries(
@@ -679,7 +681,9 @@ def main() -> None:
         if os.path.exists(args.feed):
             feed = atoma.parse_atom_file(args.feed)
             for entry in feed.entries:
-                if last_updated is None or entry.updated > last_updated:
+                if entry.updated is not None and (
+                    last_updated is None or entry.updated > last_updated
+                ):
                     last_updated = entry.updated
 
         fg = FeedGenerator()
