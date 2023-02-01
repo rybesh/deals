@@ -126,7 +126,6 @@ def call_public_api(client: httpx.Client, endpoint: str) -> dict:
 def get(client: httpx.Client, url: str, params: Optional[dict] = None) -> str:
     if params is None:
         params = {}
-
     r = client.get(
         url,
         params=params,
@@ -182,7 +181,6 @@ def float_value_of(price: str) -> float:
 def get_price_statistics(
     client: httpx.Client, release_id: str
 ) -> Optional[tuple[float, float, float]]:
-
     release_url = f"https://www.discogs.com/release/{release_id}"
     html = get(client, release_url)
 
@@ -245,7 +243,6 @@ def summarize_difference(difference: int) -> str:
 def summarize_benchmarked_price(
     console: Console, benchmarked_price: Optional[BenchmarkedPrice]
 ) -> None:
-
     if benchmarked_price is None:
         grid = "[bold]never sold"
     else:
@@ -297,7 +294,6 @@ def summarize(
     condition: str,
     benchmarked_price: Optional[BenchmarkedPrice],
 ) -> str:
-
     console.print(Padding(f"[bold blue]{entry.title.value}", (1, 0)))
 
     status.stop()
@@ -391,7 +387,6 @@ def get_deal(
     skip_never_sold: bool,
     demand_ratio: float,
 ) -> Optional[Deal]:
-
     # adjust price for standard domestic shipping
     price = price - STANDARD_SHIPPING
 
@@ -516,12 +511,10 @@ def get_deals(
     skip_never_sold: bool,
     since: Optional[datetime],
 ) -> Iterator[Deal]:
-
     status = None
 
     for condition in conditions:
         for currency in currencies:
-
             status_message = (
                 f"[blue]Checking {currency} listings in {condition} condition..."
             )
@@ -627,7 +620,6 @@ def copy_remaining_entries(
 
 
 def main() -> None:
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-c",
@@ -688,7 +680,6 @@ def main() -> None:
         console = Console()
 
     if args.feed is not None:
-
         if os.path.exists(args.feed):
             feed = atoma.parse_atom_file(args.feed)
             for entry in feed.entries:
@@ -705,7 +696,6 @@ def main() -> None:
         fg.author(FEED_AUTHOR)
 
     with httpx.Client() as client:
-
         for deal in get_deals(
             client,
             console,
