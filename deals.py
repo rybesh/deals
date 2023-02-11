@@ -33,6 +33,7 @@ from config import (
     FEED_DISPLAY_WIDTH,
     FEED_URL,
     MAX_FEED_ENTRIES,
+    MINIMUM_SELLER_RATING,
     STANDARD_SHIPPING,
     TIMEOUT,
     TOKEN,
@@ -358,6 +359,9 @@ def meets_criteria(
     seller_rating: float,
 ) -> bool:
     if price is None or seller in BLOCKED_SELLERS:
+        return False
+
+    if seller_rating < MINIMUM_SELLER_RATING:
         return False
 
     if condition == CONDITIONS["VG+"]:
