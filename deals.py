@@ -9,6 +9,7 @@ import logging
 import re
 import sys
 from atoma.atom import AtomEntry, AtomFeed
+from collections import OrderedDict
 from datetime import date, datetime, timezone
 from feedgen.feed import FeedGenerator
 from io import StringIO
@@ -22,25 +23,48 @@ from rich.text import Text
 from time import sleep
 from tendo.singleton import SingleInstance, SingleInstanceException
 from typing import Iterator, NamedTuple, Optional
-from config import (
-    ALLOW_VG,
-    API,
-    BLOCKED_SELLERS,
-    CONDITIONS,
-    CURRENCIES,
-    DISCOGS_USER,
-    FEED_AUTHOR,
-    FEED_DISPLAY_WIDTH,
-    FEED_URL,
-    MAX_FEED_ENTRIES,
-    MINIMUM_SELLER_RATING,
-    STANDARD_SHIPPING,
-    TIMEOUT,
-    TOKEN,
-    WWW,
+from config import config
+
+
+def always_true(*args):  # pyright: ignore
+    return True
+
+
+try:
+    from criteria import meets_criteria
+except ImportError:
+    meets_criteria = always_true
+
+
+API = "https://api.discogs.com"
+WWW = "https://www.discogs.com"
+
+CONDITIONS: dict[str, str] = OrderedDict(
+    [
+        ("P", "Poor (P)"),
+        ("F", "Fair (F)"),
+        ("G", "Good Plus (G+)"),
+        ("VG", "Very Good (VG)"),
+        ("VG+", "Very Good Plus (VG+)"),
+        ("NM", "Near Mint (NM or M-)"),
+        ("M", "Mint (M)"),
+    ]
 )
 
-GQLVariables = dict[str, str]
+CURRENCIES = [
+    "AUD",
+    "BRL",
+    "CAD",
+    "CHF",
+    "EUR",
+    "GBP",
+    "JPY",
+    "MXN",
+    "NZD",
+    "SEK",
+    "USD",
+    "ZAR",
+]
 
 
 class Deal(NamedTuple):
@@ -109,8 +133,8 @@ def handle_http_error(console: Console, e: httpx.HTTPError) -> None:
 def call_public_api(client: httpx.Client, endpoint: str) -> dict:
     r = client.get(
         API + endpoint,
-        headers={"Authorization": f"Discogs token={TOKEN}"},
-        timeout=TIMEOUT,
+        headers={"Authorization": f"Discogs token={config.TOKEN}"},
+        timeout=config.TIMEOUT,
     )
     calls_remaining = int(r.headers.get("X-Discogs-Ratelimit-Remaining", 0))
     if calls_remaining < 5:
@@ -130,7 +154,7 @@ def get(client: httpx.Client, url: str, params: Optional[dict] = None) -> str:
     r = client.get(
         url,
         params=params,
-        timeout=TIMEOUT,
+        timeout=config.TIMEOUT,
     )
     if not r.status_code == 200:
         raise DealException(f"GET {r.url} failed ({r.status_code})", r.status_code)
@@ -301,7 +325,9 @@ def summarize(
     console.record = True
 
     if entry.summary is not None:
-        console.print(html.unescape(entry.summary.value), width=FEED_DISPLAY_WIDTH)
+        console.print(
+            html.unescape(entry.summary.value), width=config.FEED_DISPLAY_WIDTH
+        )
 
     summarize_benchmarked_price(console, benchmarked_price)
 
@@ -327,7 +353,7 @@ def summarize(
     grid.add_row("year", "unknown" if release_year is None else str(release_year))
     grid.add_row("condition", abbreviate(condition))
 
-    console.print(grid, width=FEED_DISPLAY_WIDTH)
+    console.print(grid, width=config.FEED_DISPLAY_WIDTH)
 
     summary = export_html(console)
     console.record = False
@@ -350,32 +376,6 @@ def summarize(
     return summary
 
 
-def meets_criteria(
-    seller: str,
-    price: Optional[float],
-    condition: str,
-    release_age: int,
-    release_genres: set[str],
-    seller_rating: float,
-) -> bool:
-    if price is None or seller in BLOCKED_SELLERS:
-        return False
-
-    if seller_rating < MINIMUM_SELLER_RATING:
-        return False
-
-    if condition == CONDITIONS["VG+"]:
-        if seller_rating < ALLOW_VG["minimum_seller_rating"]:
-            return False
-        if (
-            release_age < ALLOW_VG["minimum_age"]
-            and len(release_genres.intersection(ALLOW_VG["genres"])) == 0
-        ):
-            return False
-
-    return True
-
-
 def get_deal(
     client: httpx.Client,
     console: Console,
@@ -392,7 +392,7 @@ def get_deal(
     demand_ratio: float,
 ) -> Optional[Deal]:
     # adjust price for standard domestic shipping
-    price = price - STANDARD_SHIPPING
+    price = price - config.STANDARD_SHIPPING
 
     price_statistics = get_price_statistics(client, release_id)
     suggested_price = get_suggested_price(client, release_id, condition)
@@ -445,24 +445,20 @@ def process_listing(
         price = get_total_price(listing)
         release_year = get_release_year(listing)
         release_genres = set(release["genres"])
-        release_age = (
-            ALLOW_VG["minimum_age"]
-            if release_year is None
-            else date.today().year - release_year
-        )
+        release_age = 50 if release_year is None else date.today().year - release_year
         accepts_offers = listing.get("allow_offers", False)
         demand_ratio = get_demand_ratio(release)
 
+        if price is None:  # unavailable in user's region
+            return None
+
         if meets_criteria(
-            listing["seller"]["username"],
-            price,
             condition,
             release_age,
             release_genres,
+            listing["seller"]["username"],
             seller_rating,
         ):
-            assert price is not None
-
             return get_deal(
                 client,
                 console,
@@ -531,7 +527,7 @@ def get_deals(
             wantlist_url = f"{WWW}/sell/mpmywantsrss"
             wantlist_params = {
                 "output": "rss",
-                "user": DISCOGS_USER,
+                "user": config.DISCOGS_USER,
                 "condition": condition,
                 "currency": currency,
                 "limit": "250",
@@ -572,7 +568,11 @@ def get_deals(
 def condition(arg: str) -> list[str]:
     if arg == "all":
         return list(CONDITIONS.values())
-    if "," in arg:
+
+    if arg.startswith(">") and arg[1:] in CONDITIONS:
+        keys = list(CONDITIONS.keys())
+        args = keys[keys.index(arg[1:]) + 1 :]
+    elif "," in arg:
         args = arg.split(",")
     else:
         args = [arg]
@@ -614,7 +614,7 @@ def copy_remaining_entries(
 ) -> None:
     if feed is not None:
         for entry in feed.entries:
-            if feed_entries < MAX_FEED_ENTRIES:
+            if feed_entries < config.MAX_FEED_ENTRIES:
                 if entry.id_ not in deal_ids:
                     deal_ids.add(entry.id_)
                     copy_entry(entry, fg)
@@ -693,11 +693,11 @@ def main() -> None:
                     last_updated = entry.updated
 
         fg = FeedGenerator()
-        fg.id(FEED_URL)
+        fg.id(config.FEED_URL)
         fg.title("Discogs Deals")
         fg.updated(now())
-        fg.link(href=FEED_URL, rel="self")
-        fg.author(FEED_AUTHOR)
+        fg.link(href=config.FEED_URL, rel="self")
+        fg.author({"name": config.FEED_AUTHOR_NAME, "email": config.FEED_AUTHOR_EMAIL})
 
     with httpx.Client() as client:
         for deal in get_deals(
@@ -710,7 +710,7 @@ def main() -> None:
             args.skip_never_sold,
             last_updated,
         ):
-            if fg is not None and feed_entries < MAX_FEED_ENTRIES:
+            if fg is not None and feed_entries < config.MAX_FEED_ENTRIES:
                 if deal.id not in deal_ids:
                     deal_ids.add(deal.id)
                     fe = fg.add_entry(order="append")

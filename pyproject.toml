@@ -6,3 +6,4 @@ include = '\.pyi?$'
 [tool.pyright]
 venv = "venv"
 venvPath = "."
+pythonVersion = "3.9"

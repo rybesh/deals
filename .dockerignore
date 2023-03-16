@@ -1,0 +1,6 @@
+**/.env
+**/__pycache__
+atom.xml
+fly.toml
+pyproject.toml
+venv
