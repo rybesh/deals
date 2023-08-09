@@ -1,6 +1,6 @@
 #!/bin/sh
 
-python3 /deals.py \
+/venv/bin/python /deals.py \
     --quiet \
     --condition '>VG' \
     --minimum-discount 20 \

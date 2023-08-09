@@ -4,18 +4,20 @@ WORKDIR /
 
 # install python libs and scripts and generate initial feed
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl \
-    python3 \
+    python3-full \
     python3-setuptools \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 COPY requirements.txt /tmp/requirements.txt
+RUN python3 -m venv /venv
 RUN set -ex && \
-    python3 -m pip install --upgrade pip && \
-    python3 -m pip install -r /tmp/requirements.txt && \
+    /venv/bin/python -m pip install --upgrade pip && \
+    /venv/bin/python -m pip install -r /tmp/requirements.txt && \
     rm -rf /root/.cache/
 RUN mkdir -p /srv/http
 RUN curl -o /srv/http/index.xml https://deals.fly.dev/index.xml
