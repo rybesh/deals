@@ -14,18 +14,19 @@ RUN apt-get update && \
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-COPY pyproject.toml /
-COPY src /
+RUN mkdir -p /pkg/deals
+COPY pyproject.toml /pkg/deals/
+COPY src /pkg/deals/
 COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m venv /venv
 RUN set -ex && \
     /venv/bin/python -m pip install --upgrade pip && \
     /venv/bin/python -m pip install -r /tmp/requirements.txt && \
+    /venv/bin/python -m pip install /pkg/deals && \
     rm -rf /root/.cache/
 
 RUN mkdir -p /srv/http
-#RUN curl -o /srv/http/index.xml https://deals.fly.dev/index.xml
-COPY index.xml /srv/http/
+RUN curl -o /srv/http/index.xml https://deals.fly.dev/index.xml
 COPY wantlist.pickle /
 COPY update-feed.sh /
 COPY update-wantlist.sh /
@@ -39,7 +40,11 @@ RUN --mount=type=secret,id=DISCOGS_USER \
     FEED_URL="$(cat /run/secrets/FEED_URL)" \
     FEED_AUTHOR_NAME="$(cat /run/secrets/FEED_AUTHOR_NAME)" \
     FEED_AUTHOR_EMAIL="$(cat /run/secrets/FEED_AUTHOR_EMAIL)" \
-    ./update-feed.sh
+    /venv/bin/python -I \
+    -m deals.main \
+    --quiet \
+    --feed /srv/http/index.xml \
+    --minutes 1
 
 # install supercronic and crontab
 

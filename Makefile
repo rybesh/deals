@@ -12,6 +12,7 @@ $(PYTHON):
 	$(PIP) install --upgrade pip
 	$(PIP) install wheel
 	$(PIP) install -r requirements.txt
+	$(PIP) install --editable .
 
 run: | $(PYTHON)
 	time $(PYTHON) -I \
@@ -30,7 +31,6 @@ secrets:
 deploy:
 	source .env && \
 	fly deploy \
-	--local-only \
 	--build-secret DISCOGS_USER="$$DISCOGS_USER" \
 	--build-secret TOKEN="$$TOKEN" \
 	--build-secret FEED_URL="$$FEED_URL" \
