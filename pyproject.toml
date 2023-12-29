@@ -1,9 +1,13 @@
+[project]
+name = "deals"
+version = "2024.0.0"
+
 [tool.black]
 line-length = 88
-target-version = ['py39']
+target-version = ['py311']
 include = '\.pyi?$'
 
 [tool.pyright]
 venv = "venv"
 venvPath = "."
-pythonVersion = "3.9"
+pythonVersion = "3.11"

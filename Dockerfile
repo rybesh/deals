@@ -13,18 +13,22 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+
+COPY pyproject.toml /
+COPY src /
 COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m venv /venv
 RUN set -ex && \
     /venv/bin/python -m pip install --upgrade pip && \
     /venv/bin/python -m pip install -r /tmp/requirements.txt && \
     rm -rf /root/.cache/
+
 RUN mkdir -p /srv/http
-RUN curl -o /srv/http/index.xml https://deals.fly.dev/index.xml
-COPY deals.py /
-COPY config.py /
-COPY criteria.py /
+#RUN curl -o /srv/http/index.xml https://deals.fly.dev/index.xml
+COPY index.xml /srv/http/
+COPY wantlist.pickle /
 COPY update-feed.sh /
+COPY update-wantlist.sh /
 RUN --mount=type=secret,id=DISCOGS_USER \
     --mount=type=secret,id=TOKEN \
     --mount=type=secret,id=FEED_URL \

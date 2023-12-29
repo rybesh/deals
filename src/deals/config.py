@@ -17,7 +17,7 @@ class Config:
     FEED_AUTHOR_NAME: str
     FEED_AUTHOR_EMAIL: str
     TIMEOUT: float = 30.0
-    MAX_FEED_ENTRIES: int = 25
+    MAX_FEED_ENTRIES: int = 50
     FEED_DISPLAY_WIDTH: int = 28
     STANDARD_SHIPPING: float = 5.00
 

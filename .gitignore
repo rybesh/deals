@@ -1,5 +1,7 @@
+*.pickle
 .env
 __pycache__
-atom.xml
+build
 criteria.py
+index.xml
 venv

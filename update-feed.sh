@@ -1,8 +1,7 @@
 #!/bin/sh
 
-/venv/bin/python /deals.py \
+/venv/bin/python -I \
+    -m deals.main \
     --quiet \
-    --condition '>VG' \
-    --minimum-discount 20 \
-    --skip-never-sold \
-    --feed /srv/http/index.xml
+    --feed /srv/http/index.xml \
+    --minutes 20

@@ -1,6 +1,5 @@
 **/.env
 **/__pycache__
-atom.xml
+build
 fly.toml
-pyproject.toml
 venv
