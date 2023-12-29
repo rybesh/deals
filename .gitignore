@@ -1,4 +1,5 @@
 *.pickle
+*.egg-info
 .env
 __pycache__
 build

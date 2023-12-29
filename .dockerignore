@@ -3,3 +3,4 @@
 build
 fly.toml
 venv
+**/*.egg-info
