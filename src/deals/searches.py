@@ -84,8 +84,8 @@ def keywords_for_want(want: Want) -> list[str]:
     keywords = {normalize(part) for part in want.release.title.split("/")}
     keywords |= {normalize(a.name) for a in want.release.artists}
     keywords |= keywords_for_labels(want.release.labels)
-    # if want.release.country != "US":
-    #     keywords.add(want.release.country)
+    if want.release.country != "US":
+        keywords.add(want.release.country)
     return [k for k in keywords if len(k) > 0]
 
 

@@ -57,6 +57,7 @@ class Release(NamedTuple):
     thumbnail: str
     genres: set[str]
     year: int | None
+    country: str
     have: int
     want: int
     price_suggestions: dict[Condition, float]
@@ -73,6 +74,7 @@ class Release(NamedTuple):
             o["thumb"],
             set(o["genres"]),
             o.get("year", None),
+            o["country"],
             o["community"]["have"],
             o["community"]["want"],
             price_suggestions,
