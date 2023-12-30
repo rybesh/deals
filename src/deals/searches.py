@@ -1,3 +1,4 @@
+import pickle
 import re
 import sys
 
@@ -10,6 +11,7 @@ from . import wantlist
 from .api import API, Want, Label
 
 NON_WORD_CHARS = re.compile(r"\W+")
+SEARCHES_FILENAME = "searches.pickle"
 
 
 class Category(NamedTuple):
@@ -100,13 +102,23 @@ def search_url_for(want: Want) -> str:
 
 
 def main() -> None:
+    data = []
     console = Console()
-
     with Client() as client:
         api = API(client, console)
         for want in wantlist.get(api):
-            if want.release.id == 7401:
-                print(search_url_for(want))
+            data.append(
+                {
+                    "search_url": search_url_for(want),
+                    "price_suggestions": {
+                        cond.name: price
+                        for cond, price in want.release.price_suggestions.items()
+                    },
+                }
+            )
+    with open(SEARCHES_FILENAME, "wb") as f:
+        pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+    print(f"Wrote {len(data)} searches to {SEARCHES_FILENAME}", file=sys.stderr)
 
 
 if __name__ == "__main__":
