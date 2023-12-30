@@ -172,7 +172,7 @@ def get_listings(
     last_release_id = load_last_release_id()
     try:
         start = time()
-        for want in sorted(wantlist.get(api), key=lambda w: w.release.id):
+        for want in wantlist.get(api):
             if want.release.id <= last_release_id:
                 continue
             with console.status(f"[dim]{want.release.get_description()}") as status:

@@ -1,5 +1,3 @@
-#! ./venv/bin/python
-
 import argparse
 import pickle
 import sys
@@ -59,7 +57,7 @@ def get(api: API, refresh_cache=False) -> list[Want]:
                 cache.update(page, want)
         finally:
             _save_cache(cache)
-    return list(cache.wants.values())
+    return sorted(cache.wants.values(), key=lambda w: w.release.id)
 
 
 def main() -> None:
