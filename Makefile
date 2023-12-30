@@ -25,6 +25,10 @@ update_wantlist: | $(PYTHON)
 	-m deals.wantlist \
 	--clear
 
+searches.pickle: | $(PYTHON)
+	time $(PYTHON) -I \
+	-m deals.searches
+
 clean:
 	rm -rf venv
 
