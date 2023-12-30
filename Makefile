@@ -5,7 +5,7 @@ APP := deals
 REGION := iad
 .DEFAULT_GOAL := run
 
-.PHONY: run clean secrets deploy
+.PHONY: update_feed update_wantlist clean secrets deploy
 
 $(PYTHON):
 	python3 -m venv venv
@@ -14,11 +14,16 @@ $(PYTHON):
 	$(PIP) install -r requirements.txt
 	$(PIP) install --editable .
 
-run: | $(PYTHON)
+update_feed: | $(PYTHON)
 	time $(PYTHON) -I \
 	-m deals.main \
 	--feed atom.xml \
 	--minutes 1
+
+update_wantlist: | $(PYTHON)
+	time $(PYTHON) -I \
+	-m deals.wantlist \
+	--clear
 
 clean:
 	rm -rf venv
