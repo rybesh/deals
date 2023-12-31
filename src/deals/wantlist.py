@@ -55,6 +55,9 @@ def get(api: API, refresh_cache=False) -> list[WantlistItem]:
                 config.DISCOGS_USER, first_page=first_page
             ):
                 cache.update(page, want)
+
+            # finished iterating wants; reset page to 1
+            cache.page = 1
         finally:
             _save_cache(cache)
     return sorted(cache.wants.values(), key=lambda w: w.release.id)
