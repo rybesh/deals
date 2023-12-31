@@ -82,18 +82,19 @@ def keywords_for_labels(labels: dict[Label, str | None]) -> set[str]:
     return keywords
 
 
-def keywords_for_want(want: Want) -> list[str]:
-    keywords = {normalize(part) for part in want.release.title.split("/")}
-    keywords |= {normalize(a.name) for a in want.release.artists}
-    keywords |= keywords_for_labels(want.release.labels)
-    if want.release.country != "US":
-        keywords.add(want.release.country)
+def keywords_for_release(release: Release) -> list[str]:
+    keywords = {normalize(part) for part in release.title.split("/")}
+    keywords |= {normalize(a.name) for a in release.artists}
+    keywords |= keywords_for_labels(release.labels)
+    if not (release.country is None or release.country == "US"):
+        keywords.add(release.country)
     return [k for k in keywords if len(k) > 0]
 
 
 def search_url_for(want: Want) -> str:
+    keywords = keywords_for_release(want.release)
     query = {
-        "_nkw": " ".join(keywords_for_want(want)),
+        "_nkw": " ".join(keywords),
         "LH_TitleDesc": 1,
     }
     return (
