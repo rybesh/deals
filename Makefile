@@ -21,6 +21,7 @@ update_feed: | $(PYTHON)
 	--minutes 1
 
 update_wantlist: | $(PYTHON)
+	caffeinate -s \
 	time $(PYTHON) -I \
 	-m deals.wantlist \
 	--clear
