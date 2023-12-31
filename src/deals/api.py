@@ -66,14 +66,14 @@ class Release(NamedTuple):
     def from_json(cls, o: dict, price_suggestions: dict[Condition, float]):
         return Release(
             o["id"],
-            o.get("master_id", None),
+            o.get("master_id"),
             o["title"],
             sorted({Artist.from_json(d) for d in o["artists"]}, key=BY_NAME),
             sorted({f["name"] for f in o["formats"]}),
             {Label.from_json(d): d.get("catno") for d in o["labels"]},
             o["thumb"],
             set(o["genres"]),
-            o.get("year", None),
+            o.get("year"),
             o.get("country"),
             o["community"]["have"],
             o["community"]["want"],
