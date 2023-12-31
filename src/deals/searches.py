@@ -8,7 +8,7 @@ from typing import NamedTuple
 from urllib.parse import urlencode
 
 from . import wantlist
-from .api import API, Want, Label
+from .api import API, WantlistItem, Release, Label
 
 NON_WORD_CHARS = re.compile(r"\W+")
 SEARCHES_FILENAME = "searches.pickle"
@@ -28,8 +28,8 @@ CASSETTES = Category(176983, "Cassettes")
 CDS = Category(176984, "Music-CDs")
 
 
-def category_for_want(want: Want) -> Category:
-    match want.release.formats:
+def category_for_release(release: Release) -> Category:
+    match release.formats:
         case ["Acetate"]:
             return VINYL
         case ["All Media", *rest] | ["Box Set", *rest]:
@@ -91,15 +91,15 @@ def keywords_for_release(release: Release) -> list[str]:
     return [k for k in keywords if len(k) > 0]
 
 
-def search_url_for(want: Want) -> str:
+def search_url_for(want: WantlistItem) -> str:
     keywords = keywords_for_release(want.release)
+    if len(want.notes) > 0:
+        keywords.append(normalize(want.notes))
     query = {
         "_nkw": " ".join(keywords),
         "LH_TitleDesc": 1,
     }
-    return (
-        f"https://www.ebay.com/sch/{category_for_want(want)}/i.html?{urlencode(query)}"
-    )
+    return f"https://www.ebay.com/sch/{category_for_release(want.release)}/i.html?{urlencode(query)}"
 
 
 def main() -> None:
@@ -109,13 +109,13 @@ def main() -> None:
         api = API(client, console)
         for want in wantlist.get(api):
             data.append(
-                {
-                    "search_url": search_url_for(want),
-                    "price_suggestions": {
+                (
+                    search_url_for(want),
+                    {
                         cond.name: price
                         for cond, price in want.release.price_suggestions.items()
                     },
-                }
+                )
             )
     with open(SEARCHES_FILENAME, "wb") as f:
         pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)

@@ -6,18 +6,18 @@ from httpx import Client
 from io import StringIO
 from rich.console import Console
 
-from .api import API, Want
+from .api import API, WantlistItem
 from .config import config
 
 CACHE_FILENAME = "wantlist.pickle"
 
 
 class Cache:
-    def __init__(self, page: int, wants: dict[int, Want]):
+    def __init__(self, page: int, wants: dict[int, WantlistItem]):
         self.page = page
         self.wants = wants
 
-    def update(self, page: int, want: Want):
+    def update(self, page: int, want: WantlistItem):
         self.page = page
         self.wants[want.release.id] = want
 
@@ -46,7 +46,7 @@ def _clear_cache() -> None:
     _save_cache(Cache(1, {}))
 
 
-def get(api: API, refresh_cache=False) -> list[Want]:
+def get(api: API, refresh_cache=False) -> list[WantlistItem]:
     cache = _load_cache()
     first_page = 1 if refresh_cache else cache.page
     if len(cache.wants) == 0 or refresh_cache:

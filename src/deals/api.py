@@ -156,9 +156,10 @@ class Listing(NamedTuple):
         return round((suggested_price - adjusted_price) / suggested_price * 100)
 
 
-class Want(NamedTuple):
+class WantlistItem(NamedTuple):
     release: Release
     date_added: datetime
+    notes: str
 
 
 class APIException(Exception):
@@ -276,7 +277,7 @@ class API:
 
     def fetch_wantlist(
         self, username: str, first_page: int = 1
-    ) -> Iterator[tuple[int, Want]]:
+    ) -> Iterator[tuple[int, WantlistItem]]:
         for p in self.paginate_api_results(
             f"/users/{username}/wants", first_page=first_page
         ):
@@ -288,4 +289,5 @@ class API:
             ):
                 release = self.fetch_release(w["id"])
                 date_added = datetime.fromisoformat(w["date_added"])
-                yield (page, Want(release, date_added))
+                notes = w.get("notes", "")
+                yield (page, WantlistItem(release, date_added, notes))
