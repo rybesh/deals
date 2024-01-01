@@ -201,9 +201,11 @@ def get_listings(
             if minutes and (elapsed / 60 > minutes):
                 break
         # finished iterating wants; reset last release ID to 0
+        log("Finished checking wantlist")
         last_release_id = 0
     finally:
         save_last_release_id(last_release_id)
+        log(f"Stopping; next time we'll start with release {last_release_id}")
 
 
 def copy_entry(entry: AtomEntry, fg: FeedGenerator) -> None:

@@ -5,6 +5,7 @@ import sys
 from httpx import Client
 from io import StringIO
 from rich.console import Console
+from typing import Any
 
 from .api import API, WantlistItem
 from .config import config
@@ -27,6 +28,10 @@ class CustomUnpickler(pickle.Unpickler):
         if name == "Cache":
             return Cache
         return super().find_class(module, name)
+
+
+def log(x: Any) -> None:
+    print(x, file=sys.stderr)
 
 
 def _load_cache() -> Cache:
@@ -86,6 +91,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.clear:
+        log("Clearing and refreshing wantlist cache...")
         _clear_cache()
 
     if args.quiet:
@@ -99,7 +105,7 @@ def main() -> None:
             get(api, refresh_cache=args.refresh)
         finally:
             cache = _load_cache()
-            console.print(f"{len(cache.wants)} wantlist items cached")
+            log(f"{len(cache.wants)} wantlist items cached")
 
 
 if __name__ == "__main__":
