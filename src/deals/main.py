@@ -17,7 +17,7 @@ from httpx import Client
 from io import StringIO
 from tendo.singleton import SingleInstance, SingleInstanceException
 from time import time
-from typing import Iterator
+from typing import Iterator, Any
 
 from . import wantlist
 from .feeds import Feeds
@@ -28,6 +28,10 @@ from .criteria import meets_criteria, BLOCKED_SELLERS
 PROGRESS_FILENAME = "progress.pickle"
 FORMAT = "<pre><code>{code}</code></pre>{foreground}{background}{stylesheet}"
 SPAN_OPEN = re.compile(r'<span style="[^"]*">')
+
+
+def log(x: Any) -> None:
+    print(x, file=sys.stderr)
 
 
 def isoformat(dt: datetime) -> str:
@@ -170,6 +174,7 @@ def get_listings(
     api = API(client, console)
     feeds = Feeds(client, console)
     last_release_id = load_last_release_id()
+    log(f"Checking wantlist starting with release {last_release_id}...")
     try:
         start = time()
         for want in wantlist.get(api):
@@ -296,6 +301,9 @@ def main() -> None:
                         fe.link(href=listing.uri)
                         fe.content(summary, type="html")
                         feed_entries += 1
+
+        log(f"Added {feed_entries} items to feed")
+
     finally:
         if fg is not None:
             copy_remaining_entries(feed, fg, feed_entries, listing_ids)

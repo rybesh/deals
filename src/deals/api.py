@@ -1,4 +1,5 @@
 import re
+import sys
 
 from datetime import date, datetime
 from enum import Enum
@@ -16,6 +17,10 @@ API_ROOT = "https://api.discogs.com"
 
 UNIQUE_NUM = re.compile(r" \(\d+\)$")
 BY_NAME = attrgetter("name")
+
+
+def log(x: Any) -> None:
+    print(x, file=sys.stderr)
 
 
 class Condition(Enum):
@@ -180,6 +185,7 @@ class API:
         self.console = console
 
     def _handle_api_exception(self, e: APIException) -> None:
+        log(e)
         self.console.rule(style="red")
         self.console.print(f"[red]{e}")
         if e.details is not None:
