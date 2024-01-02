@@ -177,9 +177,11 @@ def get_listings(
     log(f"Checking wantlist starting with release {last_release_id}...")
     try:
         start = time()
+
         for want in wantlist.get(api):
             if want.release.id <= last_release_id:
                 continue
+
             with console.status(f"[dim]{want.release.get_description()}") as status:
                 for entry in feeds.listings_for_release(want.release.id, since):
                     assert entry.summary is not None
