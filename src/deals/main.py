@@ -30,6 +30,11 @@ FORMAT = "<pre><code>{code}</code></pre>{foreground}{background}{stylesheet}"
 SPAN_OPEN = re.compile(r'<span style="[^"]*">')
 
 
+class TimeLimitException(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
 def log(x: Any) -> None:
     print(x, file=sys.stderr)
 
@@ -198,13 +203,18 @@ def get_listings(
                                 console.print(f"[dim]Rejected listing {listing.id}")
                         except ValueError as e:
                             console.print(f"[dim]{e}")
+
             last_release_id = want.release.id
+
             elapsed = time() - start
-            if minutes and (elapsed / 60 > minutes):
-                break
+            if minutes and ((elapsed / 60) > minutes):
+                raise TimeLimitException(f"Elapsed time exceeded {minutes} minutes")
+
         # finished iterating wants; reset last release ID to 0
         log("Finished checking wantlist")
         last_release_id = 0
+    except TimeLimitException as e:
+        log(e)
     finally:
         save_last_release_id(last_release_id)
         log(f"Stopping; next time we'll start with release {last_release_id}")
