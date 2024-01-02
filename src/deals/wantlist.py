@@ -47,14 +47,16 @@ def _save_cache(cache: Cache) -> None:
         pickle.dump(cache, f, pickle.HIGHEST_PROTOCOL)
 
 
-def _clear_cache() -> None:
-    _save_cache(Cache(1, {}))
+def get(api: API, clear_cache=False, refresh_cache=False) -> list[WantlistItem]:
+    if clear_cache:
+        log("Clearing wantlist cache...")
+        cache = Cache(1, {})
+    else:
+        cache = _load_cache()
 
-
-def get(api: API, refresh_cache=False) -> list[WantlistItem]:
-    cache = _load_cache()
     first_page = 1 if refresh_cache else cache.page
     if len(cache.wants) == 0 or refresh_cache:
+        log("Refreshing wantlist cache...")
         try:
             for page, want in api.fetch_wantlist(
                 config.DISCOGS_USER, first_page=first_page
@@ -65,6 +67,7 @@ def get(api: API, refresh_cache=False) -> list[WantlistItem]:
             cache.page = 1
         finally:
             _save_cache(cache)
+
     return sorted(cache.wants.values(), key=lambda w: w.release.id)
 
 
@@ -89,10 +92,6 @@ def main() -> None:
         action="store_true",
     )
     args = parser.parse_args()
-
-    if args.clear:
-        log("Clearing and refreshing wantlist cache...")
-        _clear_cache()
 
     if args.quiet:
         console = Console(file=StringIO())
