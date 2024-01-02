@@ -1,4 +1,5 @@
 import argparse
+import os
 import pickle
 import sys
 
@@ -43,8 +44,9 @@ def _load_cache() -> Cache:
 
 
 def _save_cache(cache: Cache) -> None:
-    with open(CACHE_FILENAME, "wb") as f:
+    with open(CACHE_FILENAME + ".new", "wb") as f:
         pickle.dump(cache, f, pickle.HIGHEST_PROTOCOL)
+        os.rename(CACHE_FILENAME + ".new", CACHE_FILENAME)
 
 
 def get(api: API, clear_cache=False, refresh_cache=False) -> list[WantlistItem]:
