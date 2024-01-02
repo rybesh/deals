@@ -304,10 +304,9 @@ def main() -> None:
                         fe.content(summary, type="html")
                         feed_entries += 1
 
-        log(f"Added {feed_entries} items to feed")
-
     finally:
         if fg is not None:
+            log(f"Added {feed_entries} new items to feed")
             copy_remaining_entries(feed, fg, feed_entries, listing_ids)
             fg.atom_file(f"{args.feed}.new", pretty=True)
             os.rename(f"{args.feed}.new", args.feed)

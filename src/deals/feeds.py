@@ -7,11 +7,15 @@ from httpx import Client, HTTPError
 from ratelimit import limits, sleep_and_retry
 from rich.console import Console
 from time import sleep
-from typing import Iterator
+from typing import Iterator, Any
 
 from .config import config
 
 WWW_ROOT = "https://www.discogs.com"
+
+
+def log(x: Any) -> None:
+    print(x, file=sys.stderr)
 
 
 class FeedException(Exception):
@@ -30,6 +34,7 @@ class Feeds:
         self.console = console
 
     def _handle_feed_exception(self, e: FeedException) -> None:
+        log(e)
         self.console.rule(style="red")
         self.console.print(f"[red]{e}")
         self.console.rule(style="red")
