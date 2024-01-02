@@ -292,6 +292,7 @@ class API:
             for w in track(
                 p["wants"],
                 description=f"[blue]Loading wantlist page {page} of {pages}...",
+                console=self.console,
             ):
                 release = self.fetch_release(w["id"])
                 date_added = datetime.fromisoformat(w["date_added"])
