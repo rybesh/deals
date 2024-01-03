@@ -21,7 +21,7 @@ from typing import Iterator, Any
 
 from . import wantlist
 from .feeds import Feeds
-from .api import API, Listing
+from .api import API, APIException, Listing
 from .config import config
 from .criteria import meets_criteria, BLOCKED_SELLERS
 
@@ -201,8 +201,8 @@ def get_listings(
                                 status.start()
                             else:
                                 console.print(f"[dim]Rejected listing {listing.id}")
-                        except ValueError as e:
-                            console.print(f"[dim]{e}")
+                        except (APIException, ValueError) as e:
+                            log(e)
 
             last_release_id = want.release.id
 
