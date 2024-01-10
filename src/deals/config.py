@@ -17,9 +17,10 @@ class Config:
     FEED_AUTHOR_NAME: str
     FEED_AUTHOR_EMAIL: str
     TIMEOUT: float = 30.0
-    MAX_FEED_ENTRIES: int = 50
+    MAX_FEED_ENTRIES: int = 1000
     FEED_DISPLAY_WIDTH: int = 28
     STANDARD_SHIPPING: float = 5.00
+    TIME_WINDOW_DAYS: int = 1
 
     """
     Map environment variables to class fields according to these rules:

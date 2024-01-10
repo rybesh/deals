@@ -21,7 +21,7 @@ from typing import Iterator, Any
 
 from . import wantlist
 from .feeds import Feeds
-from .api import API, APIException, Listing
+from .api import API, APIException, Listing, RejectedListingException
 from .config import config
 from .criteria import meets_criteria, BLOCKED_SELLERS
 
@@ -174,7 +174,7 @@ def save_last_release_id(release_id: int) -> None:
 
 
 def get_listings(
-    client: Client, console: Console, since: datetime, minutes: int | None
+    client: Client, console: Console, minutes: int | None, old_listing_ids: set[str]
 ) -> Iterator[Listing]:
     api = API(client, console)
     feeds = Feeds(client, console)
@@ -188,8 +188,13 @@ def get_listings(
                 continue
 
             with console.status(f"[dim]{want.release.get_description()}") as status:
-                for entry in feeds.listings_for_release(want.release.id, since):
+                for entry in feeds.listings_for_release(
+                    want.release.id, now() - timedelta(days=config.TIME_WINDOW_DAYS)
+                ):
                     assert entry.summary is not None
+                    if entry.id_ in old_listing_ids:
+                        continue
+
                     listing_id = int(entry.id_.split("/")[-1])
                     seller_username = entry.summary.value.split(" - ")[1]
                     if seller_username not in BLOCKED_SELLERS:
@@ -201,7 +206,9 @@ def get_listings(
                                 status.start()
                             else:
                                 console.print(f"[dim]Rejected listing {listing.id}")
-                        except (APIException, ValueError) as e:
+                        except RejectedListingException as e:
+                            console.print(f"[dim]{e}")
+                        except APIException as e:
                             log(e)
 
             last_release_id = want.release.id
@@ -231,13 +238,16 @@ def copy_entry(entry: AtomEntry, fg: FeedGenerator) -> None:
 
 
 def copy_remaining_entries(
-    feed: AtomFeed | None, fg: FeedGenerator, feed_entries: int, deal_ids: set[str]
+    feed: AtomFeed | None,
+    fg: FeedGenerator,
+    feed_entries: int,
+    old_listing_ids: set[str],
 ) -> None:
     if feed is not None:
         for entry in feed.entries:
             if feed_entries < config.MAX_FEED_ENTRIES:
-                if entry.id_ not in deal_ids:
-                    deal_ids.add(entry.id_)
+                if entry.id_ not in old_listing_ids:
+                    old_listing_ids.add(entry.id_)
                     copy_entry(entry, fg)
                     feed_entries += 1
             else:
@@ -266,9 +276,8 @@ def main() -> None:
 
     fg = None
     feed = None
-    feed_entries = 0
-    listing_ids = set()
-    last_updated = None
+    feed_entries: int = 0
+    listing_ids: set[str] = set()
 
     args = parser.parse_args()
 
@@ -281,10 +290,7 @@ def main() -> None:
         if os.path.exists(args.feed):
             feed = parse_atom_file(args.feed)
             for entry in feed.entries:
-                if entry.updated is not None and (
-                    last_updated is None or entry.updated > last_updated
-                ):
-                    last_updated = entry.updated
+                listing_ids.add(entry.id_)
 
         fg = FeedGenerator()
         fg.id(config.FEED_URL)
@@ -296,10 +302,7 @@ def main() -> None:
     try:
         with Client() as client:
             for listing in get_listings(
-                client,
-                console,
-                since=(last_updated or (now() - timedelta(days=1))),
-                minutes=args.minutes,
+                client, console, minutes=args.minutes, old_listing_ids=listing_ids
             ):
                 summary = f'<img src="{listing.release.thumbnail}"/>\n' + summarize(
                     console, listing
@@ -307,7 +310,6 @@ def main() -> None:
 
                 if fg is not None and feed_entries < config.MAX_FEED_ENTRIES:
                     if listing.id not in listing_ids:
-                        listing_ids.add(listing.id)
                         fe = fg.add_entry(order="append")
                         fe.id(f"https://www.discogs.com/sell/item/{listing.id}")
                         fe.title(listing.release.get_description())
@@ -318,10 +320,10 @@ def main() -> None:
 
     finally:
         if fg is not None:
-            log(f"Added {feed_entries} new items to feed")
             copy_remaining_entries(feed, fg, feed_entries, listing_ids)
             fg.atom_file(f"{args.feed}.new", pretty=True)
             os.rename(f"{args.feed}.new", args.feed)
+            log(f"Added {feed_entries} new items to feed")
 
 
 if __name__ == "__main__":

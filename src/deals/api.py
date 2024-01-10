@@ -128,7 +128,7 @@ class Listing(NamedTuple):
         try:
             shipping_price = o["shipping_price"]["value"]
         except KeyError as e:
-            raise ValueError(f"Rejected listing {o['id']}") from e
+            raise RejectedListingException(f"Rejected listing {o['id']}") from e
 
         return cls(
             o["id"],
@@ -165,6 +165,14 @@ class WantlistItem(NamedTuple):
     release: Release
     date_added: datetime
     notes: str
+
+
+class RejectedListingException(Exception):
+    def __init__(
+        self,
+        message: str,
+    ):
+        super().__init__(message)
 
 
 class APIException(Exception):
