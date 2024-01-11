@@ -103,7 +103,7 @@ def main() -> None:
     with Client() as client:
         api = API(client, console)
         try:
-            get(api, refresh_cache=args.refresh)
+            get(api, clear_cache=args.clear, refresh_cache=args.refresh)
         finally:
             cache = _load_cache()
             log(f"{len(cache.wants)} wantlist items cached")
