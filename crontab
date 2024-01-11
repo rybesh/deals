@@ -1,2 +1,2 @@
 */30 * * * * /update-feed.sh
-   0 3 * * 4 /update-wantlist.sh
+   0 3 * * 5 /update-wantlist.sh
