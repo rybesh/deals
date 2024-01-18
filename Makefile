@@ -26,19 +26,22 @@ update_wantlist: | $(PYTHON)
 	-m deals.wantlist \
 	--clear
 
-searches.pickle: | $(PYTHON)
+wantlist.pickle:
+	rsync deals.internal:$@ $@
+
+searches.pickle: wantlist.pickle | $(PYTHON)
 	time $(PYTHON) -I \
 	-m deals.searches
 
 clean:
-	rm -rf venv
+	rm -rf venv wantlist.pickle
 
 secrets:
 	cat .env | fly secrets import
 	@echo
 	fly secrets list
 
-deploy:
+deploy: wantlist.pickle
 	source .env && \
 	fly deploy \
 	--build-secret DISCOGS_USER="$$DISCOGS_USER" \

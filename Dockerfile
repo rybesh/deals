@@ -10,6 +10,7 @@ RUN apt-get update && \
     python3-full \
     python3-setuptools \
     python3-pip \
+    rsync \
     && rm -rf /var/lib/apt/lists/*
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
