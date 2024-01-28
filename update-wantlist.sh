@@ -8,4 +8,5 @@
 /venv/bin/python -I \
     -m deals.searches
 
-mv /searches.pickle /srv/http/searches.pickle
+cp -f /wantlist.pickle /srv/http/wantlist.pickle
+cp -f /searches.pickle /srv/http/searches.pickle

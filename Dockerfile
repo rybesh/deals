@@ -26,9 +26,12 @@ RUN set -ex && \
     /venv/bin/python -m pip install /pkg/deals && \
     rm -rf /root/.cache/
 
+RUN curl -o /wantlist.pickle http://deals.internal:8043/wantlist.pickle
+RUN curl -o /searches.pickle http://deals.internal:8043/searches.pickle
 RUN mkdir -p /srv/http
-RUN curl -o /srv/http/index.xml https://deals.fly.dev/index.xml
-COPY wantlist.pickle /
+RUN curl -o /srv/http/index.xml http://deals.internal:8043/index.xml
+RUN cp /wantlist.pickle /srv/http/wantlist.pickle
+RUN cp /searches.pickle /srv/http/searches.pickle
 COPY update-feed.sh /
 COPY update-wantlist.sh /
 RUN --mount=type=secret,id=DISCOGS_USER \
