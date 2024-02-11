@@ -12,6 +12,7 @@ from .api import API, WantlistItem, Release, Label
 
 NON_WORD_CHARS = re.compile(r"\W+")
 SEARCHES_FILENAME = "searches.pickle"
+SKIP_KEYWORD = "noebay"
 
 
 class Category(NamedTuple):
@@ -91,10 +92,13 @@ def keywords_for_release(release: Release) -> list[str]:
     return [k for k in keywords if len(k) > 0]
 
 
-def search_url_for(want: WantlistItem) -> str:
+def search_url_for(want: WantlistItem) -> str | None:
     keywords = keywords_for_release(want.release)
     if len(want.notes) > 0:
-        keywords.append(normalize(want.notes))
+        if SKIP_KEYWORD in want.notes:
+            return None
+        else:
+            keywords.append(normalize(want.notes))
     query = {
         "_nkw": " ".join(keywords),
         "LH_TitleDesc": 1,
@@ -108,15 +112,17 @@ def main() -> None:
     with Client() as client:
         api = API(client, console)
         for want in wantlist.get(api):
-            data.append(
-                (
-                    search_url_for(want),
-                    {
-                        cond.name: price
-                        for cond, price in want.release.price_suggestions.items()
-                    },
+            search_url = search_url_for(want)
+            if search_url is not None:
+                data.append(
+                    (
+                        search_url,
+                        {
+                            cond.name: price
+                            for cond, price in want.release.price_suggestions.items()
+                        },
+                    )
                 )
-            )
     with open(SEARCHES_FILENAME, "wb") as f:
         pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
     print(f"Wrote {len(data)} searches to {SEARCHES_FILENAME}", file=sys.stderr)
