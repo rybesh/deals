@@ -1,5 +1,5 @@
 atoma==0.0.17
-feedgen==0.9.0
+feedgen==1.0.0
 httpx==0.25.2
 python-dotenv==1.0.1
 ratelimit==2.2.1
