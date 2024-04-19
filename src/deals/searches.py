@@ -121,6 +121,7 @@ def main() -> None:
                             cond.name: price
                             for cond, price in want.release.price_suggestions.items()
                         },
+                        want.release.id,
                     )
                 )
     with open(SEARCHES_FILENAME, "wb") as f:
