@@ -20,7 +20,9 @@ class Cache:
         self.wants = wants
 
     def update(self, page: int, want: WantlistItem):
-        self.page = page
+        if not self.page == page:
+            log(f"Cached wantlist page {self.page}")
+            self.page = page
         self.wants[want.release.id] = want
 
 
