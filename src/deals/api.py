@@ -51,6 +51,22 @@ class Label(NamedTuple):
     def from_json(cls, o: dict):
         return cls(o["id"], UNIQUE_NUM.sub("", o["name"]))
 
+def parse_labels(l: list[dict]) -> dict[Label, str | None]:
+    labels = {}
+    for d in l:
+        label = Label.from_json(d)
+        catno = d.get("catno")
+        if catno == "none":
+            catno = None
+        if label in labels:
+            if labels[label] is None:
+                labels[label] = catno
+            else:
+                if catno is not None and len(catno) < len(labels[label]):
+                    labels[label] = catno
+        else:
+            labels[label] = catno
+    return labels
 
 class Release(NamedTuple):
     id: int
@@ -75,7 +91,7 @@ class Release(NamedTuple):
             o["title"],
             sorted({Artist.from_json(d) for d in o["artists"]}, key=BY_NAME),
             sorted({f["name"] for f in o["formats"]}),
-            {Label.from_json(d): d.get("catno") for d in o["labels"]},
+            parse_labels(o["labels"]),
             o["thumb"],
             set(o["genres"]),
             o.get("year"),
