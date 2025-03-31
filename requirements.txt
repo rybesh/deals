@@ -3,5 +3,5 @@ feedgen==1.0.0
 httpx==0.28.1
 python-dotenv==1.1.0
 ratelimit==2.2.1
-rich==13.9.4
+rich==14.0.0
 tendo==0.3.0
