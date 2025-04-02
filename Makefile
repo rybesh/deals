@@ -1,11 +1,9 @@
 SHELL = /bin/bash
 PYTHON := ./venv/bin/python
 PIP := ./venv/bin/python -m pip
-APP := deals
-REGION := iad
-.DEFAULT_GOAL := run
+.DEFAULT_GOAL := index.xml
 
-.PHONY: update_feed update_wantlist clean secrets deploy
+.PHONY: clean secrets deploy
 
 $(PYTHON):
 	python3 -m venv venv
@@ -14,38 +12,25 @@ $(PYTHON):
 	$(PIP) install -r requirements.txt
 	$(PIP) install --editable .
 
-update_feed: | $(PYTHON)
-	time $(PYTHON) -I \
-	-m deals.main \
-	--feed atom.xml \
-	--minutes 1
-
-update_wantlist: | $(PYTHON)
-	caffeinate -s \
-	time $(PYTHON) -I \
-	-m deals.wantlist \
-	--clear
-
-wantlist.pickle:
-	rsync deals.internal:$@ $@
+wantlist.pickle: | $(PYTHON)
+	rsync deals.internal:$@ $@ || \
+	caffeinate -s time $(PYTHON) -I -m deals.wantlist --clear
 
 searches.pickle: wantlist.pickle | $(PYTHON)
-	time $(PYTHON) -I \
-	-m deals.searches
+	rsync deals.internal:$@ $@ || \
+	time $(PYTHON) -I -m deals.searches
+
+index.xml: wantlist.pickle | $(PYTHON)
+	rsync deals.internal:$@ $@ || \
+	time $(PYTHON) -I -m deals.main --feed $@ --minutes 1
 
 clean:
-	rm -rf venv wantlist.pickle
+	rm -rf venv wantlist.pickle searches.pickle index.xml
 
 secrets:
 	cat .env | fly secrets import
 	@echo
 	fly secrets list
 
-deploy: wantlist.pickle
-	source .env && \
-	fly deploy \
-	--build-secret DISCOGS_USER="$$DISCOGS_USER" \
-	--build-secret TOKEN="$$TOKEN" \
-	--build-secret FEED_URL="$$FEED_URL" \
-	--build-secret FEED_AUTHOR_NAME="$$FEED_AUTHOR_NAME" \
-	--build-secret FEED_AUTHOR_EMAIL="$$FEED_AUTHOR_EMAIL"
+deploy: wantlist.pickle searches.pickle index.xml
+	fly deploy

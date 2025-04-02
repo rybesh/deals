@@ -26,29 +26,18 @@ RUN set -ex && \
     /venv/bin/python -m pip install /pkg/deals && \
     rm -rf /root/.cache/
 
-RUN curl -o /wantlist.pickle http://deals.internal:8043/wantlist.pickle
-RUN curl -o /searches.pickle http://deals.internal:8043/searches.pickle
+COPY wantlist.pickle /
+COPY searches.pickle /
+COPY index.xml /
+
 RUN mkdir -p /srv/http
-RUN curl -o /srv/http/index.xml http://deals.internal:8043/index.xml
-RUN cp /wantlist.pickle /srv/http/wantlist.pickle
-RUN cp /searches.pickle /srv/http/searches.pickle
+COPY wantlist.pickle /srv/http/
+COPY searches.pickle /srv/http/
+COPY index.xml /srv/http/
+
 COPY update-feed.sh /
 COPY update-wantlist.sh /
-RUN --mount=type=secret,id=DISCOGS_USER \
-    --mount=type=secret,id=TOKEN \
-    --mount=type=secret,id=FEED_URL \
-    --mount=type=secret,id=FEED_AUTHOR_NAME \
-    --mount=type=secret,id=FEED_AUTHOR_EMAIL \
-    DISCOGS_USER="$(cat /run/secrets/DISCOGS_USER)" \
-    TOKEN="$(cat /run/secrets/TOKEN)" \
-    FEED_URL="$(cat /run/secrets/FEED_URL)" \
-    FEED_AUTHOR_NAME="$(cat /run/secrets/FEED_AUTHOR_NAME)" \
-    FEED_AUTHOR_EMAIL="$(cat /run/secrets/FEED_AUTHOR_EMAIL)" \
-    /venv/bin/python -I \
-    -m deals.main \
-    --quiet \
-    --feed /srv/http/index.xml \
-    --minutes 1
+COPY entrypoint.sh /
 
 # install supercronic and crontab
 
@@ -62,5 +51,4 @@ RUN go install github.com/PierreZ/goStatic@latest
 
 # start supercronic and goStatic
 
-COPY ./entrypoint.sh /
 ENTRYPOINT ["./entrypoint.sh"]

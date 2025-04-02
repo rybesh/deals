@@ -3,5 +3,7 @@
 /venv/bin/python -I \
     -m deals.main \
     --quiet \
-    --feed /srv/http/index.xml \
+    --feed /index.xml \
     --minutes 25
+
+cp -f /index.xml /srv/http/index.xml
